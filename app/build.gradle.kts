@@ -111,6 +111,11 @@ dependencies {
     // QuackJS for YouTube player decipher & n-transform
     implementation(files("libs/quackjs.jar"))
 
+    // InnerTubeX extraction engine (Metrolist - JVM desktop target)
+    implementation("com.github.MetrolistGroup.innertubex:innertubex-desktop:v0.11.7") {
+        exclude(group = "com.github.MetrolistGroup.quackjs")
+    }
+
     // Unit Testing
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20240303")
