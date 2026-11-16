@@ -48,13 +48,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
-import com.nova.music.core.designsystem.theme.DarkSurface
-import com.nova.music.core.designsystem.theme.DarkSurfaceVariant
-import com.nova.music.core.designsystem.theme.NovaCyan
-import com.nova.music.core.designsystem.theme.PureBlack
-import com.nova.music.core.designsystem.theme.TextPrimary
-import com.nova.music.core.designsystem.theme.TextSecondary
-import com.nova.music.core.designsystem.theme.TextTertiary
+import com.nova.music.core.designsystem.theme.StereoTheme
 import com.nova.music.domain.model.Track
 
 @Composable
@@ -64,42 +58,50 @@ fun SearchScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val keyboardController = LocalSoftwareKeyboardController.current
+    val colors = StereoTheme.colors
 
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(PureBlack)
+            .background(colors.background)
             .padding(horizontal = 16.dp)
     ) {
         Spacer(modifier = Modifier.height(16.dp))
 
-        // NOVA Brand Header
+        // STEREO Brand Header
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "NOVA",
+                text = "STEREO",
                 style = MaterialTheme.typography.displayLarge.copy(
                     fontWeight = FontWeight.Black,
-                    letterSpacing = 2.sp,
-                    color = NovaCyan
-                )
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                text = "MUSIC",
-                style = MaterialTheme.typography.titleMedium.copy(
-                    fontWeight = FontWeight.Light,
                     letterSpacing = 4.sp,
-                    color = TextSecondary
+                    color = colors.primaryAccent
                 )
             )
+            Spacer(modifier = Modifier.width(10.dp))
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(colors.surfaceElevated)
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
+            ) {
+                Text(
+                    text = "HI-FI AUDIO",
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.5.sp,
+                        color = colors.secondaryAccent
+                    )
+                )
+            }
         }
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Search Input Bar
+        // Tactile Search Input Bar
         OutlinedTextField(
             value = state.query,
             onValueChange = viewModel::onQueryChange,
@@ -107,7 +109,7 @@ fun SearchScreen(
             placeholder = {
                 Text(
                     text = "Search songs, artists, albums...",
-                    color = TextTertiary,
+                    color = colors.textTertiary,
                     style = MaterialTheme.typography.bodyMedium
                 )
             },
@@ -115,7 +117,7 @@ fun SearchScreen(
                 Icon(
                     imageVector = Icons.Default.Search,
                     contentDescription = "Search",
-                    tint = NovaCyan
+                    tint = colors.primaryAccent
                 )
             },
             trailingIcon = {
@@ -128,7 +130,7 @@ fun SearchScreen(
                         Icon(
                             imageVector = Icons.Default.Clear,
                             contentDescription = "Clear",
-                            tint = TextSecondary
+                            tint = colors.textSecondary
                         )
                     }
                 }
@@ -136,13 +138,13 @@ fun SearchScreen(
             singleLine = true,
             shape = RoundedCornerShape(16.dp),
             colors = OutlinedTextFieldDefaults.colors(
-                focusedContainerColor = DarkSurface,
-                unfocusedContainerColor = DarkSurface,
-                focusedBorderColor = NovaCyan,
-                unfocusedBorderColor = DarkSurfaceVariant,
-                cursorColor = NovaCyan,
-                focusedTextColor = TextPrimary,
-                unfocusedTextColor = TextPrimary
+                focusedContainerColor = colors.surface,
+                unfocusedContainerColor = colors.surface,
+                focusedBorderColor = colors.primaryAccent,
+                unfocusedBorderColor = colors.surfaceHighlight,
+                cursorColor = colors.primaryAccent,
+                focusedTextColor = colors.textPrimary,
+                unfocusedTextColor = colors.textPrimary
             ),
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
             keyboardActions = KeyboardActions(
@@ -177,7 +179,7 @@ fun SearchScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         CircularProgressIndicator(
-                            color = NovaCyan,
+                            color = colors.primaryAccent,
                             strokeWidth = 3.dp,
                             modifier = Modifier.size(44.dp)
                         )
@@ -191,7 +193,7 @@ fun SearchScreen(
                         Text(
                             text = "No songs found for \"${state.query}\"",
                             style = MaterialTheme.typography.bodyLarge,
-                            color = TextSecondary
+                            color = colors.textSecondary
                         )
                     }
                 }
@@ -204,7 +206,7 @@ fun SearchScreen(
                             Text(
                                 text = searchState.message,
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.error
+                                color = colors.error
                             )
                         }
                     }
@@ -240,11 +242,13 @@ private fun TrackItem(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val colors = StereoTheme.colors
+
     Row(
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
-            .background(if (isCurrentlyPlaying) DarkSurfaceVariant else PureBlack)
+            .background(if (isCurrentlyPlaying) colors.surfaceElevated else colors.surface)
             .clickable(onClick = onClick)
             .padding(8.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -254,21 +258,21 @@ private fun TrackItem(
             modifier = Modifier
                 .size(54.dp)
                 .clip(RoundedCornerShape(8.dp))
-                .background(DarkSurface),
+                .background(colors.surfaceHighlight),
             contentAlignment = Alignment.Center
         ) {
-            if (track.thumbnailUrl.isNotEmpty()) {
+            if (track.thumbnailUrl.isNotBlank()) {
                 AsyncImage(
                     model = track.thumbnailUrl,
                     contentDescription = track.title,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
                 )
             } else {
                 Icon(
                     imageVector = Icons.Default.MusicNote,
                     contentDescription = null,
-                    tint = TextTertiary
+                    tint = colors.textTertiary
                 )
             }
         }
@@ -283,7 +287,7 @@ private fun TrackItem(
                 text = track.title,
                 style = MaterialTheme.typography.bodyLarge.copy(
                     fontWeight = if (isCurrentlyPlaying) FontWeight.Bold else FontWeight.Medium,
-                    color = if (isCurrentlyPlaying) NovaCyan else TextPrimary
+                    color = if (isCurrentlyPlaying) colors.primaryAccent else colors.textPrimary
                 ),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -292,7 +296,7 @@ private fun TrackItem(
             Text(
                 text = track.artist + (track.album?.let { " • $it" } ?: ""),
                 style = MaterialTheme.typography.bodyMedium,
-                color = TextSecondary,
+                color = colors.textSecondary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -305,14 +309,14 @@ private fun TrackItem(
             Icon(
                 imageVector = Icons.Default.GraphicEq,
                 contentDescription = "Playing",
-                tint = NovaCyan,
+                tint = colors.primaryAccent,
                 modifier = Modifier.size(20.dp)
             )
         } else if (track.durationSeconds > 0) {
             Text(
                 text = track.durationFormatted,
                 style = MaterialTheme.typography.labelSmall,
-                color = TextTertiary
+                color = colors.textTertiary
             )
         }
     }
@@ -322,6 +326,8 @@ private fun TrackItem(
 private fun SearchIdlePlaceholder(
     onSuggestionClick: (String) -> Unit
 ) {
+    val colors = StereoTheme.colors
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -331,20 +337,20 @@ private fun SearchIdlePlaceholder(
         Icon(
             imageVector = Icons.Default.MusicNote,
             contentDescription = null,
-            tint = DarkSurfaceVariant,
+            tint = colors.surfaceElevated,
             modifier = Modifier.size(64.dp)
         )
         Spacer(modifier = Modifier.height(16.dp))
         Text(
             text = "Discover Any Song",
             style = MaterialTheme.typography.titleLarge,
-            color = TextPrimary
+            color = colors.textPrimary
         )
         Spacer(modifier = Modifier.height(8.dp))
         Text(
             text = "Search YouTube Music's global catalog with lossless audio extraction",
             style = MaterialTheme.typography.bodyMedium,
-            color = TextTertiary,
+            color = colors.textTertiary,
             modifier = Modifier.padding(horizontal = 32.dp)
         )
 
@@ -353,8 +359,9 @@ private fun SearchIdlePlaceholder(
         Text(
             text = "Popular Searches",
             style = MaterialTheme.typography.labelSmall,
-            color = NovaCyan,
-            fontWeight = FontWeight.Bold
+            color = colors.primaryAccent,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 1.sp
         )
 
         Spacer(modifier = Modifier.height(12.dp))
@@ -365,14 +372,14 @@ private fun SearchIdlePlaceholder(
                 modifier = Modifier
                     .padding(vertical = 4.dp)
                     .clip(RoundedCornerShape(20.dp))
-                    .background(DarkSurface)
+                    .background(colors.surface)
                     .clickable { onSuggestionClick(suggestion) }
                     .padding(horizontal = 16.dp, vertical = 8.dp)
             ) {
                 Text(
                     text = suggestion,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = TextSecondary
+                    color = colors.textSecondary
                 )
             }
         }

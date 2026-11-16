@@ -1,8 +1,22 @@
 <resources>
-    <string name="app_name">NOVA Music</string>
+    <string name="app_name">STEREO</string>
+    <string name="app_tagline">Hi-Fi Audio</string>
     <string name="search_hint">Search songs, artists, albums...</string>
     <string name="tab_home">Home</string>
     <string name="tab_search">Search</string>
     <string name="tab_library">Library</string>
+    <string name="tab_themes">Themes</string>
     <string name="now_playing">Now Playing</string>
+    <string name="notification_channel_name">STEREO Playback</string>
+    
+    <!-- Accessibility Descriptions -->
+    <string name="cd_play">Play</string>
+    <string name="cd_pause">Pause</string>
+    <string name="cd_next">Next Track</string>
+    <string name="cd_previous">Previous Track</string>
+    <string name="cd_seek_bar">Playback Position</string>
+    <string name="cd_album_art">Album Artwork</string>
+    <string name="cd_clear_search">Clear Search</string>
+    <string name="cd_close">Close</string>
+    <string name="cd_settings">Settings</string>
 </resources>

@@ -25,8 +25,8 @@ class NovaMediaSessionService : MediaSessionService(), KoinComponent {
     private var mediaSession: MediaSession? = null
 
     companion object {
-        const val NOTIFICATION_CHANNEL_ID = "nova_playback_channel"
-        const val NOTIFICATION_CHANNEL_NAME = "Music Playback"
+        const val NOTIFICATION_CHANNEL_ID = "stereo_playback_channel"
+        const val NOTIFICATION_CHANNEL_NAME = "STEREO Playback"
     }
 
     override fun onCreate() {

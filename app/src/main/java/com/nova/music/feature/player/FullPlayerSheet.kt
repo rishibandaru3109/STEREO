@@ -1,6 +1,8 @@
 package com.nova.music.feature.player
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -52,14 +54,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
-import com.nova.music.core.designsystem.theme.DarkSurface
-import com.nova.music.core.designsystem.theme.DarkSurfaceHighlight
-import com.nova.music.core.designsystem.theme.NovaCyan
-import com.nova.music.core.designsystem.theme.NovaPurple
-import com.nova.music.core.designsystem.theme.PureBlack
-import com.nova.music.core.designsystem.theme.TextPrimary
-import com.nova.music.core.designsystem.theme.TextSecondary
-import com.nova.music.core.designsystem.theme.TextTertiary
+import com.nova.music.core.designsystem.theme.StereoTheme
 import com.nova.music.domain.model.PlayerStatus
 import com.nova.music.domain.model.RepeatMode
 
@@ -72,11 +67,12 @@ fun FullPlayerSheet(
     val state by viewModel.playbackState.collectAsStateWithLifecycle()
     val track = state.currentTrack ?: return
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val colors = StereoTheme.colors
 
     ModalBottomSheet(
         onDismissRequest = onDismissRequest,
         sheetState = sheetState,
-        containerColor = PureBlack,
+        containerColor = colors.playerBackground,
         dragHandle = null
     ) {
         Column(
@@ -86,7 +82,7 @@ fun FullPlayerSheet(
                 .padding(bottom = 32.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Top Bar with Dismiss Icon
+            // Top Bar with Dismiss Icon and STEREO Label
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -97,217 +93,236 @@ fun FullPlayerSheet(
                     Icon(
                         imageVector = Icons.Default.KeyboardArrowDown,
                         contentDescription = "Collapse",
-                        tint = TextPrimary,
+                        tint = colors.textPrimary,
                         modifier = Modifier.size(32.dp)
                     )
                 }
 
                 Spacer(modifier = Modifier.weight(1f))
 
-                // Quality Badge
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(DarkSurface)
-                        .padding(horizontal = 10.dp, vertical = 4.dp)
-                ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
-                        text = "OPUS • 160 KBPS",
+                        text = "PLAYING FROM SEARCH",
                         style = MaterialTheme.typography.labelSmall.copy(
+                            letterSpacing = 2.sp,
                             fontWeight = FontWeight.Bold,
-                            letterSpacing = 1.sp
-                        ),
-                        color = NovaCyan
+                            color = colors.primaryAccent
+                        )
+                    )
+                    Text(
+                        text = "STEREO HI-FI",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            letterSpacing = 1.sp,
+                            color = colors.textTertiary
+                        )
                     )
                 }
 
                 Spacer(modifier = Modifier.weight(1f))
-                Spacer(modifier = Modifier.size(32.dp))
+                Spacer(modifier = Modifier.width(48.dp)) // balance balance
             }
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Large Album Artwork
+            // High-Resolution Album Artwork with Tactile Border
             Box(
                 modifier = Modifier
                     .fillMaxWidth(0.85f)
                     .aspectRatio(1f)
-                    .clip(RoundedCornerShape(24.dp))
-                    .background(DarkSurface),
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(colors.surfaceElevated)
+                    .border(1.dp, colors.surfaceHighlight, RoundedCornerShape(20.dp)),
                 contentAlignment = Alignment.Center
             ) {
-                if (track.thumbnailUrl.isNotEmpty()) {
+                if (track.thumbnailUrl.isNotBlank()) {
                     AsyncImage(
                         model = track.thumbnailUrl,
                         contentDescription = track.title,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize()
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
                     )
                 } else {
                     Icon(
                         imageVector = Icons.Default.MusicNote,
                         contentDescription = null,
-                        tint = TextTertiary,
-                        modifier = Modifier.size(80.dp)
+                        tint = colors.textTertiary,
+                        modifier = Modifier.size(72.dp)
                     )
                 }
             }
 
             Spacer(modifier = Modifier.height(28.dp))
 
-            // Title & Artist
-            Text(
-                text = track.title,
-                style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
-                color = TextPrimary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                textAlign = TextAlign.Center
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = track.artist + (track.album?.let { " • $it" } ?: ""),
-                style = MaterialTheme.typography.bodyLarge,
-                color = TextSecondary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                textAlign = TextAlign.Center
-            )
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // Progress Slider
-            var isUserSeeking by remember { mutableStateOf(false) }
-            var seekValue by remember { mutableFloatStateOf(0f) }
-
-            val currentPos = if (isUserSeeking) (seekValue * state.durationMs).toLong() else state.currentPositionMs
-            val currentProgress = if (isUserSeeking) seekValue else state.progress
-
-            Slider(
-                value = currentProgress,
-                onValueChange = {
-                    isUserSeeking = true
-                    seekValue = it
-                },
-                onValueChangeFinished = {
-                    isUserSeeking = false
-                    viewModel.seekTo((seekValue * state.durationMs).toLong())
-                },
-                colors = SliderDefaults.colors(
-                    thumbColor = NovaCyan,
-                    activeTrackColor = NovaCyan,
-                    inactiveTrackColor = DarkSurfaceHighlight
-                ),
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            // Current Time & Duration
-            Row(
+            // Track Title & Artist
+            Column(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalAlignment = Alignment.Start
             ) {
                 Text(
-                    text = formatMs(currentPos),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = TextTertiary
+                    text = track.title,
+                    style = MaterialTheme.typography.headlineMedium.copy(
+                        fontWeight = FontWeight.Bold,
+                        color = colors.textPrimary
+                    ),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
+                Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = formatMs(state.durationMs),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = TextTertiary
+                    text = track.artist + (track.album?.let { " • $it" } ?: ""),
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        color = colors.textSecondary
+                    ),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            // Playback Controls Row
+            // Seek Bar Scrubber
+            var isUserSeeking by remember { mutableStateOf(false) }
+            var seekPositionRatio by remember { mutableFloatStateOf(0f) }
+
+            val displayProgress = if (isUserSeeking) seekPositionRatio else state.progress
+            val durationMs = state.durationMs.coerceAtLeast(1L)
+            val currentMs = if (isUserSeeking) (seekPositionRatio * durationMs).toLong() else state.currentPositionMs
+
+            Slider(
+                value = displayProgress.coerceIn(0f, 1f),
+                onValueChange = { ratio ->
+                    isUserSeeking = true
+                    seekPositionRatio = ratio
+                },
+                onValueChangeFinished = {
+                    val targetMs = (seekPositionRatio * durationMs).toLong()
+                    viewModel.seekTo(targetMs)
+                    isUserSeeking = false
+                },
+                modifier = Modifier.fillMaxWidth(),
+                colors = SliderDefaults.colors(
+                    thumbColor = colors.sliderThumb,
+                    activeTrackColor = colors.primaryAccent,
+                    inactiveTrackColor = colors.sliderTrack
+                )
+            )
+
+            // Duration labels
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = formatTime(currentMs),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = colors.textTertiary
+                )
+                Text(
+                    text = formatTime(durationMs),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = colors.textTertiary
+                )
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // Tactile Transport Controls
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Shuffle
-                IconButton(onClick = viewModel::toggleShuffle) {
+                // Shuffle Button
+                IconButton(onClick = { viewModel.toggleShuffle() }) {
                     Icon(
                         imageVector = Icons.Default.Shuffle,
                         contentDescription = "Shuffle",
-                        tint = if (state.isShuffle) NovaCyan else TextTertiary
+                        tint = if (state.isShuffle) colors.primaryAccent else colors.controlInactive,
+                        modifier = Modifier.size(24.dp)
                     )
                 }
 
-                // Previous
+                // Previous Button
                 IconButton(
-                    onClick = viewModel::previous,
+                    onClick = { viewModel.previous() },
                     modifier = Modifier.size(48.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.SkipPrevious,
                         contentDescription = "Previous",
-                        tint = TextPrimary,
-                        modifier = Modifier.size(36.dp)
+                        tint = colors.textPrimary,
+                        modifier = Modifier.size(32.dp)
                     )
                 }
 
-                // Play / Pause Circle
+                // Main Play/Pause Button
                 Box(
                     modifier = Modifier
-                        .size(68.dp)
+                        .size(72.dp)
                         .clip(CircleShape)
-                        .background(NovaCyan),
+                        .background(colors.primaryAccent)
+                        .clickable(onClick = { viewModel.togglePlayPause() }),
                     contentAlignment = Alignment.Center
                 ) {
                     if (state.status == PlayerStatus.BUFFERING) {
                         CircularProgressIndicator(
-                            color = PureBlack,
-                            strokeWidth = 3.dp,
-                            modifier = Modifier.size(36.dp)
+                            modifier = Modifier.size(36.dp),
+                            color = if (colors.isDark) colors.background else colors.textPrimary,
+                            strokeWidth = 3.dp
                         )
                     } else {
-                        IconButton(
-                            onClick = viewModel::togglePlayPause,
-                            modifier = Modifier.fillMaxSize()
-                        ) {
-                            Icon(
-                                imageVector = if (state.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                                contentDescription = if (state.isPlaying) "Pause" else "Play",
-                                tint = PureBlack,
-                                modifier = Modifier.size(38.dp)
-                            )
-                        }
+                        Icon(
+                            imageVector = if (state.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                            contentDescription = if (state.isPlaying) "Pause" else "Play",
+                            tint = if (colors.isDark) colors.background else colors.textPrimary,
+                            modifier = Modifier.size(36.dp)
+                        )
                     }
                 }
 
-                // Next
+                // Next Button
                 IconButton(
-                    onClick = viewModel::next,
+                    onClick = { viewModel.next() },
                     modifier = Modifier.size(48.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.SkipNext,
                         contentDescription = "Next",
-                        tint = TextPrimary,
-                        modifier = Modifier.size(36.dp)
+                        tint = colors.textPrimary,
+                        modifier = Modifier.size(32.dp)
                     )
                 }
 
-                // Repeat Mode
-                IconButton(onClick = viewModel::cycleRepeatMode) {
+                // Repeat Mode Button
+                IconButton(onClick = { viewModel.cycleRepeatMode() }) {
                     Icon(
                         imageVector = when (state.repeatMode) {
                             RepeatMode.ONE -> Icons.Default.RepeatOne
                             else -> Icons.Default.Repeat
                         },
                         contentDescription = "Repeat",
-                        tint = if (state.repeatMode != RepeatMode.OFF) NovaCyan else TextTertiary
+                        tint = if (state.repeatMode != RepeatMode.OFF) colors.primaryAccent else colors.controlInactive,
+                        modifier = Modifier.size(24.dp)
                     )
                 }
+            }
+
+            // Error Display if any
+            state.errorMessage?.let { error ->
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = error,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = colors.error,
+                    textAlign = TextAlign.Center
+                )
             }
         }
     }
 }
 
-private fun formatMs(ms: Long): String {
-    val totalSeconds = (ms / 1000).coerceAtLeast(0)
+private fun formatTime(ms: Long): String {
+    val totalSeconds = (ms / 1000).coerceAtLeast(0L)
     val minutes = totalSeconds / 60
     val seconds = totalSeconds % 60
     return "%d:%02d".format(minutes, seconds)
