@@ -1,0 +1,14 @@
+package com.nova.music.domain.repository
+
+import com.nova.music.domain.model.AudioStream
+import com.nova.music.domain.model.Track
+
+/**
+ * Independent extractor abstraction.
+ * Shielding player engine and UI completely from upstream sources (InnerTubeX, YouTube, etc.)
+ */
+interface MusicExtractor {
+    suspend fun search(query: String): Result<List<Track>>
+    suspend fun resolveAudioStream(trackId: String): Result<AudioStream>
+    suspend fun getTrackDetails(trackId: String): Result<Track>
+}
