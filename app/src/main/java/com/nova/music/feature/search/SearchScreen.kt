@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -26,6 +27,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -54,6 +56,7 @@ import com.nova.music.domain.model.Track
 @Composable
 fun SearchScreen(
     viewModel: SearchViewModel,
+    onOpenThemeGallery: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -95,6 +98,23 @@ fun SearchScreen(
                         letterSpacing = 1.5.sp,
                         color = colors.secondaryAccent
                     )
+                )
+            }
+
+            Spacer(modifier = Modifier.weight(1f))
+
+            IconButton(
+                onClick = onOpenThemeGallery,
+                modifier = Modifier
+                    .clip(CircleShape)
+                    .background(colors.surfaceElevated)
+                    .size(40.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Palette,
+                    contentDescription = "Theme Gallery",
+                    tint = colors.primaryAccent,
+                    modifier = Modifier.size(20.dp)
                 )
             }
         }

@@ -12,9 +12,9 @@
 | Stage | Name | Status | Verified Checkpoint |
 |---|---|---|---|
 | **Baseline** | InnerTubeX & ExoPlayer Playback Core | **COMPLETE** | `a82e94d` |
-| **Stage A** | Rebranding & Visual Foundation | **COMPLETE** | Staged for commit |
-| **Stage B** | Theme Gallery (12 Presets & DataStore) | **IN PROGRESS** | In Progress |
-| **Stage C** | Theme Studio (Deep Customization Engine) | **QUEUED** | Pending |
+| **Stage A** | Rebranding & Visual Foundation | **COMPLETE** | `fd3273f` |
+| **Stage B** | Theme Gallery (12 Presets & DataStore) | **COMPLETE** | Staged for commit |
+| **Stage C** | Theme Studio (Deep Customization Engine) | **IN PROGRESS** | In Progress |
 | **Stage D** | Wallpaper Studio (Gradients, Blur & Dim) | **QUEUED** | Pending |
 | **Stage E** | Player Personalization (6 Layouts & Mini-Player) | **QUEUED** | Pending |
 | **Stage F** | Advanced Personalization (Density, Typography) | **QUEUED** | Pending |
@@ -31,9 +31,13 @@
 - [x] Verified live physical device playback on Realme RMX5030 (48kHz AudioTrack, background audio focus, lock-screen controls).
 - [x] Rebranded application from NOVA Music to STEREO (`strings.xml`, `AndroidManifest.xml`, notification channel).
 - [x] Created adaptive vector launcher icon (`ic_stereo_launcher.xml`, background, foreground) with retro hi-fi reel aesthetic.
-- [x] Established strongly typed `StereoColors` design token system with backward compatibility aliases.
-- [x] Polished SearchScreen, MiniPlayer, and FullPlayerSheet with tactile STEREO design tokens.
-- [x] Verified clean compilation, 7/7 passing JVM unit tests, and successful APK assembly (`assembleDebug`).
+- [x] Established strongly typed `StereoColors` design token system with backward compatibility aliases (`fd3273f`).
+- [x] Implemented 12 distinct built-in Hi-Fi themes in `ThemePresets.kt`: Midnight Stereo, Vintage Cream, Burgundy Vinyl, Olive Radio, Pure AMOLED, Cassette Sunset, Minimal Mono, Album Atmosphere, Ocean Tape, Lavender Haze, Copper Studio, Paper & Ink.
+- [x] Implemented `ThemePreferencesRepository` with Jetpack DataStore Preferences for reactive, instant theme persistence without audio interruption.
+- [x] Implemented `ThemeViewModel` and built tactile `ThemeGalleryScreen` featuring live mini-mockup preview cards, color swatches, active badges, and reset-to-default capability.
+- [x] Integrated theme switching with top header quick-action in `SearchScreen` and dynamic theme collection in `MainActivity`.
+- [x] Verified 13/13 passing automated JVM unit tests (`ThemePresetsTest`, `InnerTubeXExtractorTest`, `YouTubeMusicExtractorTest`, `NovaPlaybackUnitTest`).
+- [x] Verified clean debug APK generation (`assembleDebug`).
 
 ---
 

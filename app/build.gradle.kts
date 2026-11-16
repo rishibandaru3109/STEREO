@@ -104,6 +104,9 @@ dependencies {
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
 
+    // Jetpack DataStore Preferences
+    implementation("androidx.datastore:datastore-preferences:1.1.1")
+
     // Image Loading (Coil)
     implementation("io.coil-kt:coil-compose:2.6.0")
 

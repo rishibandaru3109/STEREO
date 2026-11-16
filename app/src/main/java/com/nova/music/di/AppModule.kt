@@ -8,6 +8,8 @@ import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import com.nova.music.core.designsystem.theme.ThemePreferencesRepository
+import com.nova.music.core.designsystem.theme.ThemeRepository
 import com.nova.music.data.extractor.InnerTubeXExtractor
 import com.nova.music.data.extractor.YouTubeMusicExtractor
 import com.nova.music.data.repository.MusicRepositoryImpl
@@ -15,6 +17,7 @@ import com.nova.music.domain.repository.MusicExtractor
 import com.nova.music.domain.repository.MusicRepository
 import com.nova.music.feature.player.PlayerViewModel
 import com.nova.music.feature.search.SearchViewModel
+import com.nova.music.feature.theme.ThemeViewModel
 import com.nova.music.playback.ExoPlayerController
 import com.nova.music.playback.NovaPlayerController
 import okhttp3.Interceptor
@@ -134,6 +137,17 @@ val appModule = module {
     viewModel {
         PlayerViewModel(
             playerController = get()
+        )
+    }
+
+    // Theme Preferences & Management
+    single<ThemeRepository> {
+        ThemePreferencesRepository(context = androidContext())
+    }
+
+    viewModel {
+        ThemeViewModel(
+            themeRepository = get()
         )
     }
 }

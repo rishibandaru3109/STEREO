@@ -19,6 +19,7 @@ import androidx.core.view.WindowCompat
  * Coherent design tokens for STEREO visual identity and theme presets.
  */
 data class StereoColors(
+    val id: String = "",
     val name: String,
     val isDark: Boolean,
     val background: Color,
