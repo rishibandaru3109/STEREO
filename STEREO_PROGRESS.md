@@ -13,9 +13,9 @@
 |---|---|---|---|
 | **Baseline** | InnerTubeX & ExoPlayer Playback Core | **COMPLETE** | `a82e94d` |
 | **Stage A** | Rebranding & Visual Foundation | **COMPLETE** | `fd3273f` |
-| **Stage B** | Theme Gallery (12 Presets & DataStore) | **COMPLETE** | Staged for commit |
-| **Stage C** | Theme Studio (Deep Customization Engine) | **IN PROGRESS** | In Progress |
-| **Stage D** | Wallpaper Studio (Gradients, Blur & Dim) | **QUEUED** | Pending |
+| **Stage B** | Theme Gallery (12 Presets & DataStore) | **COMPLETE** | `db407f7` |
+| **Stage C** | Theme Studio (Deep Customization Engine) | **COMPLETE** | Staged for commit |
+| **Stage D** | Wallpaper Studio (Gradients, Blur & Dim) | **IN PROGRESS** | In Progress |
 | **Stage E** | Player Personalization (6 Layouts & Mini-Player) | **QUEUED** | Pending |
 | **Stage F** | Advanced Personalization (Density, Typography) | **QUEUED** | Pending |
 | **Stage G** | Refinement, Accessibility & Quality Hardening | **QUEUED** | Pending |
@@ -32,11 +32,15 @@
 - [x] Rebranded application from NOVA Music to STEREO (`strings.xml`, `AndroidManifest.xml`, notification channel).
 - [x] Created adaptive vector launcher icon (`ic_stereo_launcher.xml`, background, foreground) with retro hi-fi reel aesthetic.
 - [x] Established strongly typed `StereoColors` design token system with backward compatibility aliases (`fd3273f`).
-- [x] Implemented 12 distinct built-in Hi-Fi themes in `ThemePresets.kt`: Midnight Stereo, Vintage Cream, Burgundy Vinyl, Olive Radio, Pure AMOLED, Cassette Sunset, Minimal Mono, Album Atmosphere, Ocean Tape, Lavender Haze, Copper Studio, Paper & Ink.
-- [x] Implemented `ThemePreferencesRepository` with Jetpack DataStore Preferences for reactive, instant theme persistence without audio interruption.
-- [x] Implemented `ThemeViewModel` and built tactile `ThemeGalleryScreen` featuring live mini-mockup preview cards, color swatches, active badges, and reset-to-default capability.
-- [x] Integrated theme switching with top header quick-action in `SearchScreen` and dynamic theme collection in `MainActivity`.
-- [x] Verified 13/13 passing automated JVM unit tests (`ThemePresetsTest`, `InnerTubeXExtractorTest`, `YouTubeMusicExtractorTest`, `NovaPlaybackUnitTest`).
+- [x] Implemented 12 distinct built-in Hi-Fi themes in `ThemePresets.kt` (`db407f7`).
+- [x] Implemented `ThemePreferencesRepository` with Jetpack DataStore Preferences (`db407f7`).
+- [x] Implemented `ThemeViewModel` and built tactile `ThemeGalleryScreen` (`db407f7`).
+- [x] Implemented `CustomTheme` domain model with pure JSON serialization, preset duplication, and conversion to `StereoColors`.
+- [x] Implemented `ContrastValidator` implementing W3C WCAG 2.1 relative luminance and contrast ratio algorithms.
+- [x] Implemented `ThemeStudioScreen` featuring live theme preview card, slot-by-slot color picking (primary, secondary, background, surface, text, controls) with tactile color swatches, contrast warnings, and JSON export.
+- [x] Integrated user custom theme list, creation flow, deletion, and JSON import dialog into `ThemeGalleryScreen`.
+- [x] Implemented `StereoTheme.invoke` composable operator and structured `StereoApp` scoping in `MainActivity`.
+- [x] Verified 18/18 passing automated JVM unit tests (`CustomThemeTest`, `ThemePresetsTest`, `InnerTubeXExtractorTest`, `YouTubeMusicExtractorTest`, `NovaPlaybackUnitTest`).
 - [x] Verified clean debug APK generation (`assembleDebug`).
 
 ---

@@ -121,6 +121,72 @@ object StereoTheme {
         @Composable
         @ReadOnlyComposable
         get() = LocalStereoColors.current
+
+    @Composable
+    operator fun invoke(
+        colors: StereoColors = MidnightStereoColors,
+        content: @Composable () -> Unit
+    ) {
+        val materialColorScheme = if (colors.isDark) {
+            darkColorScheme(
+                primary = colors.primaryAccent,
+                onPrimary = if (colors.isDark) PureBlack else PaperSurface,
+                primaryContainer = colors.surfaceElevated,
+                onPrimaryContainer = colors.primaryAccent,
+                secondary = colors.secondaryAccent,
+                onSecondary = PureBlack,
+                secondaryContainer = colors.surfaceHighlight,
+                onSecondaryContainer = colors.secondaryAccent,
+                background = colors.background,
+                onBackground = colors.textPrimary,
+                surface = colors.surface,
+                onSurface = colors.textPrimary,
+                surfaceVariant = colors.surfaceElevated,
+                onSurfaceVariant = colors.textSecondary,
+                error = colors.error,
+                onError = PureBlack
+            )
+        } else {
+            lightColorScheme(
+                primary = colors.primaryAccent,
+                onPrimary = PaperSurface,
+                primaryContainer = colors.surfaceElevated,
+                onPrimaryContainer = colors.primaryAccent,
+                secondary = colors.secondaryAccent,
+                onSecondary = PaperSurface,
+                secondaryContainer = colors.surfaceHighlight,
+                onSecondaryContainer = colors.secondaryAccent,
+                background = colors.background,
+                onBackground = colors.textPrimary,
+                surface = colors.surface,
+                onSurface = colors.textPrimary,
+                surfaceVariant = colors.surfaceElevated,
+                onSurfaceVariant = colors.textSecondary,
+                error = colors.error,
+                onError = PaperSurface
+            )
+        }
+
+        val view = LocalView.current
+        if (!view.isInEditMode) {
+            SideEffect {
+                val window = (view.context as Activity).window
+                window.statusBarColor = colors.background.toArgb()
+                window.navigationBarColor = colors.background.toArgb()
+                val controller = WindowCompat.getInsetsController(window, view)
+                controller.isAppearanceLightStatusBars = !colors.isDark
+                controller.isAppearanceLightNavigationBars = !colors.isDark
+            }
+        }
+
+        CompositionLocalProvider(LocalStereoColors provides colors) {
+            MaterialTheme(
+                colorScheme = materialColorScheme,
+                typography = Typography,
+                content = content
+            )
+        }
+    }
 }
 
 @Composable
@@ -128,65 +194,7 @@ fun StereoTheme(
     colors: StereoColors = MidnightStereoColors,
     content: @Composable () -> Unit
 ) {
-    val materialColorScheme = if (colors.isDark) {
-        darkColorScheme(
-            primary = colors.primaryAccent,
-            onPrimary = if (colors.isDark) PureBlack else PaperSurface,
-            primaryContainer = colors.surfaceElevated,
-            onPrimaryContainer = colors.primaryAccent,
-            secondary = colors.secondaryAccent,
-            onSecondary = PureBlack,
-            secondaryContainer = colors.surfaceHighlight,
-            onSecondaryContainer = colors.secondaryAccent,
-            background = colors.background,
-            onBackground = colors.textPrimary,
-            surface = colors.surface,
-            onSurface = colors.textPrimary,
-            surfaceVariant = colors.surfaceElevated,
-            onSurfaceVariant = colors.textSecondary,
-            error = colors.error,
-            onError = PureBlack
-        )
-    } else {
-        lightColorScheme(
-            primary = colors.primaryAccent,
-            onPrimary = PaperSurface,
-            primaryContainer = colors.surfaceElevated,
-            onPrimaryContainer = colors.primaryAccent,
-            secondary = colors.secondaryAccent,
-            onSecondary = PaperSurface,
-            secondaryContainer = colors.surfaceHighlight,
-            onSecondaryContainer = colors.secondaryAccent,
-            background = colors.background,
-            onBackground = colors.textPrimary,
-            surface = colors.surface,
-            onSurface = colors.textPrimary,
-            surfaceVariant = colors.surfaceElevated,
-            onSurfaceVariant = colors.textSecondary,
-            error = colors.error,
-            onError = PaperSurface
-        )
-    }
-
-    val view = LocalView.current
-    if (!view.isInEditMode) {
-        SideEffect {
-            val window = (view.context as Activity).window
-            window.statusBarColor = colors.background.toArgb()
-            window.navigationBarColor = colors.background.toArgb()
-            val controller = WindowCompat.getInsetsController(window, view)
-            controller.isAppearanceLightStatusBars = !colors.isDark
-            controller.isAppearanceLightNavigationBars = !colors.isDark
-        }
-    }
-
-    CompositionLocalProvider(LocalStereoColors provides colors) {
-        MaterialTheme(
-            colorScheme = materialColorScheme,
-            typography = Typography,
-            content = content
-        )
-    }
+    StereoTheme.invoke(colors = colors, content = content)
 }
 
 // Backward Compatibility for NovaTheme

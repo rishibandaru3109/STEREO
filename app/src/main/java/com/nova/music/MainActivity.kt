@@ -32,12 +32,14 @@ import com.nova.music.feature.player.PlayerViewModel
 import com.nova.music.feature.search.SearchScreen
 import com.nova.music.feature.search.SearchViewModel
 import com.nova.music.feature.theme.ThemeGalleryScreen
+import com.nova.music.feature.theme.ThemeStudioScreen
 import com.nova.music.feature.theme.ThemeViewModel
 import org.koin.androidx.compose.koinViewModel
 
 enum class MainScreen {
     SEARCH,
-    THEMES
+    THEMES,
+    THEME_STUDIO
 }
 
 class MainActivity : ComponentActivity() {
@@ -58,64 +60,82 @@ class MainActivity : ComponentActivity() {
         }
 
         setContent {
-            val themeViewModel: ThemeViewModel = koinViewModel()
-            val currentColors by themeViewModel.currentTheme.collectAsStateWithLifecycle()
+            StereoApp()
+        }
+    }
+}
 
-            StereoTheme(colors = currentColors) {
-                val searchViewModel: SearchViewModel = koinViewModel()
-                val playerViewModel: PlayerViewModel = koinViewModel()
-                var currentScreen by remember { mutableStateOf(MainScreen.SEARCH) }
-                var isFullPlayerExpanded by remember { mutableStateOf(false) }
+@Composable
+fun StereoApp() {
+    val themeViewModel: ThemeViewModel = koinViewModel()
+    val currentColors by themeViewModel.currentTheme.collectAsStateWithLifecycle()
 
-                BackHandler(enabled = currentScreen != MainScreen.SEARCH) {
-                    currentScreen = MainScreen.SEARCH
+    StereoTheme(colors = currentColors) {
+        val searchViewModel: SearchViewModel = koinViewModel()
+        val playerViewModel: PlayerViewModel = koinViewModel()
+        var currentScreen by remember { mutableStateOf(MainScreen.SEARCH) }
+        var isFullPlayerExpanded by remember { mutableStateOf(false) }
+
+        BackHandler(enabled = currentScreen != MainScreen.SEARCH) {
+            currentScreen = when (currentScreen) {
+                MainScreen.THEME_STUDIO -> MainScreen.THEMES
+                else -> MainScreen.SEARCH
+            }
+        }
+
+        Scaffold(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(currentColors.background)
+                .statusBarsPadding()
+                .navigationBarsPadding(),
+            containerColor = currentColors.background
+        ) { innerPadding ->
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+            ) {
+                when (currentScreen) {
+                    MainScreen.SEARCH -> {
+                        SearchScreen(
+                            viewModel = searchViewModel,
+                            onOpenThemeGallery = { currentScreen = MainScreen.THEMES },
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
+                    MainScreen.THEMES -> {
+                        ThemeGalleryScreen(
+                            viewModel = themeViewModel,
+                            onBackClick = { currentScreen = MainScreen.SEARCH },
+                            onCreateCustomTheme = { currentScreen = MainScreen.THEME_STUDIO },
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
+                    MainScreen.THEME_STUDIO -> {
+                        ThemeStudioScreen(
+                            viewModel = themeViewModel,
+                            initialTheme = currentColors,
+                            onBackClick = { currentScreen = MainScreen.THEMES },
+                            onThemeSaved = { currentScreen = MainScreen.THEMES },
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
                 }
 
-                Scaffold(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(currentColors.background)
-                        .statusBarsPadding()
-                        .navigationBarsPadding(),
-                    containerColor = currentColors.background
-                ) { innerPadding ->
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(innerPadding)
-                    ) {
-                        when (currentScreen) {
-                            MainScreen.SEARCH -> {
-                                SearchScreen(
-                                    viewModel = searchViewModel,
-                                    onOpenThemeGallery = { currentScreen = MainScreen.THEMES },
-                                    modifier = Modifier.fillMaxSize()
-                                )
-                            }
-                            MainScreen.THEMES -> {
-                                ThemeGalleryScreen(
-                                    viewModel = themeViewModel,
-                                    onBackClick = { currentScreen = MainScreen.SEARCH },
-                                    modifier = Modifier.fillMaxSize()
-                                )
-                            }
-                        }
+                // Floating Mini-Player docked at the bottom across all screens
+                MiniPlayer(
+                    viewModel = playerViewModel,
+                    onExpandClick = { isFullPlayerExpanded = true },
+                    modifier = Modifier.align(Alignment.BottomCenter)
+                )
 
-                        // Floating Mini-Player docked at the bottom across all screens
-                        MiniPlayer(
-                            viewModel = playerViewModel,
-                            onExpandClick = { isFullPlayerExpanded = true },
-                            modifier = Modifier.align(Alignment.BottomCenter)
-                        )
-
-                        // Full Screen Player Modal Sheet
-                        if (isFullPlayerExpanded) {
-                            FullPlayerSheet(
-                                viewModel = playerViewModel,
-                                onDismissRequest = { isFullPlayerExpanded = false }
-                            )
-                        }
-                    }
+                // Full Screen Player Modal Sheet
+                if (isFullPlayerExpanded) {
+                    FullPlayerSheet(
+                        viewModel = playerViewModel,
+                        onDismissRequest = { isFullPlayerExpanded = false }
+                    )
                 }
             }
         }
