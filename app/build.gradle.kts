@@ -51,6 +51,10 @@ android {
         buildConfig = true
     }
 
+    testOptions {
+        unitTests.isReturnDefaultValues = true
+    }
+
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
@@ -115,6 +119,9 @@ dependencies {
     implementation("com.github.MetrolistGroup.innertubex:innertubex-desktop:v0.11.7") {
         exclude(group = "com.github.MetrolistGroup.quackjs")
     }
+    implementation("io.ktor:ktor-client-okhttp:3.0.0")
+    implementation("io.ktor:ktor-client-content-negotiation:3.0.0")
+    implementation("io.ktor:ktor-serialization-kotlinx-json:3.0.0")
 
     // Unit Testing
     testImplementation("junit:junit:4.13.2")

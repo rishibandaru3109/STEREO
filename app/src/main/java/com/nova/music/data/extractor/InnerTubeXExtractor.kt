@@ -1,0 +1,337 @@
+package com.nova.music.data.extractor
+
+import android.util.Log
+import com.metrolist.innertubex.InnerTube
+import com.metrolist.innertubex.cipher.YouTubeCipherService
+import com.metrolist.innertubex.extraction.AudioQuality
+import com.metrolist.innertubex.extraction.ContentHints
+import com.metrolist.innertubex.extraction.InnerTubeExtractor
+import com.metrolist.innertubex.extraction.StreamExtractor
+import com.metrolist.innertubex.extraction.YtConfigParserImpl
+import com.metrolist.innertubex.models.YouTubeClient
+import com.nova.music.domain.model.AudioStream
+import com.nova.music.domain.model.Track
+import com.nova.music.domain.repository.MusicExtractor
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.okhttp.OkHttp
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.statement.bodyAsText
+import io.ktor.serialization.kotlinx.json.json
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.Json
+import okhttp3.OkHttpClient
+import org.json.JSONObject
+import java.net.URI
+
+/**
+ * InnerTubeX implementation of [MusicExtractor].
+ * Reuses Metrolist's multi-client catalog fallback and QuackJS AST cipher solver.
+ */
+class InnerTubeXExtractor(
+    private val okHttpClient: OkHttpClient
+) : MusicExtractor {
+
+    private val ktorClient: HttpClient = HttpClient(OkHttp) {
+        engine {
+            preconfigured = okHttpClient
+        }
+        install(ContentNegotiation) {
+            json(Json {
+                ignoreUnknownKeys = true
+                isLenient = true
+            })
+        }
+        followRedirects = false
+    }
+
+    private val innerTube: InnerTube = InnerTube(httpClient = ktorClient)
+    private val cipherService: YouTubeCipherService = YouTubeCipherService(httpClient = ktorClient)
+    private val configParser: YtConfigParserImpl = YtConfigParserImpl(
+        httpClient = ktorClient,
+        innerTube = innerTube,
+        cipherService = cipherService
+    )
+    private val streamExtractor: StreamExtractor = InnerTubeExtractor(
+        configParser = configParser,
+        cipherService = cipherService,
+        innerTube = innerTube
+    )
+
+    companion object {
+        private const val TAG = "STEREO_EXTRACTOR"
+
+        private fun logI(msg: String) {
+            try {
+                Log.i(TAG, msg)
+            } catch (_: Throwable) {
+                println("[$TAG] $msg")
+            }
+        }
+
+        private fun logE(msg: String, tr: Throwable? = null) {
+            try {
+                if (tr != null) Log.e(TAG, msg, tr) else Log.e(TAG, msg)
+            } catch (_: Throwable) {
+                System.err.println("[$TAG] $msg ${tr?.message ?: ""}")
+            }
+        }
+    }
+
+    override suspend fun search(query: String): Result<List<Track>> = withContext(Dispatchers.IO) {
+        runCatching {
+            logI("Searching music via InnerTubeX: query='$query'")
+            val startTime = System.currentTimeMillis()
+            val response = innerTube.search(
+                client = YouTubeClient.WEB_REMIX,
+                query = query
+            )
+            val jsonStr = response.bodyAsText()
+            val tracks = parseMusicSearchResponse(jsonStr)
+            val elapsed = System.currentTimeMillis() - startTime
+            logI("Search completed in ${elapsed}ms: found ${tracks.size} tracks")
+            tracks
+        }.onFailure { error ->
+            logE("Search failed for query '$query': ${error.message}", error)
+        }
+    }
+
+    override suspend fun resolveAudioStream(trackId: String): Result<AudioStream> = withContext(Dispatchers.IO) {
+        runCatching {
+            logI("Resolving audio stream via InnerTubeX for track: $trackId")
+            val startTime = System.currentTimeMillis()
+            val extracted = streamExtractor.extract(
+                videoId = trackId,
+                hints = ContentHints(),
+                audioQuality = AudioQuality.AUTO
+            ) ?: error("InnerTubeX returned null stream for track: $trackId")
+
+            val elapsed = System.currentTimeMillis() - startTime
+            val host = runCatching { URI(extracted.audioUrl).host }.getOrDefault("unknown")
+            logI("Stream resolved in ${elapsed}ms: host=$host, itag=${extracted.itag}, client=${extracted.clientName}, mime=${extracted.mimeType}")
+
+            AudioStream(
+                url = extracted.audioUrl,
+                mimeType = extracted.mimeType ?: "audio/webm",
+                codec = extracted.codecs ?: "opus",
+                bitrate = extracted.bitrate ?: 160000,
+                formatId = extracted.itag.toString(),
+                contentLength = extracted.contentLengthBytes ?: 0L,
+                isAudioOnly = true,
+                headers = extracted.headers
+            )
+        }.onFailure { error ->
+            logE("Failed to resolve stream for track '$trackId': ${error.message}", error)
+        }
+    }
+
+    override suspend fun getTrackDetails(trackId: String): Result<Track> = withContext(Dispatchers.IO) {
+        runCatching {
+            logI("Fetching track details via InnerTubeX: $trackId")
+            val response = innerTube.player(
+                client = YouTubeClient.WEB_REMIX,
+                videoId = trackId
+            )
+            val jsonStr = response.bodyAsText()
+            parsePlayerDetails(trackId, jsonStr)
+        }.onFailure { error ->
+            logE("Failed to fetch details for track '$trackId': ${error.message}", error)
+        }
+    }
+
+    private fun parsePlayerDetails(trackId: String, jsonStr: String): Track {
+        val root = JSONObject(jsonStr)
+        val details = root.optJSONObject("videoDetails") ?: error("No videoDetails in player response")
+        val title = details.optString("title", "Unknown Title")
+        val author = details.optString("author", "Unknown Artist")
+        val duration = details.optLong("lengthSeconds", 0L)
+        val thumb = details.optJSONObject("thumbnail")
+            ?.optJSONArray("thumbnails")
+            ?.let { thumbs ->
+                if (thumbs.length() > 0) thumbs.optJSONObject(thumbs.length() - 1)?.optString("url") else null
+            } ?: "https://i.ytimg.com/vi/$trackId/hqdefault.jpg"
+
+        return Track(
+            id = trackId,
+            title = title,
+            artist = author,
+            durationSeconds = duration,
+            thumbnailUrl = thumb
+        )
+    }
+
+    private fun parseMusicSearchResponse(jsonStr: String): List<Track> {
+        val tracks = mutableListOf<Track>()
+        try {
+            val root = JSONObject(jsonStr)
+            val contents = root.optJSONObject("contents")
+                ?.optJSONObject("tabbedSearchResultsRenderer")
+                ?.optJSONArray("tabs")
+                ?.optJSONObject(0)
+                ?.optJSONObject("tabRenderer")
+                ?.optJSONObject("content")
+                ?.optJSONObject("sectionListRenderer")
+                ?.optJSONArray("contents") ?: return emptyList()
+
+            for (i in 0 until contents.length()) {
+                val secObj = contents.optJSONObject(i) ?: continue
+
+                // 1. musicShelfRenderer (standard search results shelf)
+                val musicShelf = secObj.optJSONObject("musicShelfRenderer")
+                if (musicShelf != null) {
+                    val items = musicShelf.optJSONArray("contents")
+                    if (items != null) {
+                        for (j in 0 until items.length()) {
+                            val item = items.optJSONObject(j)?.optJSONObject("musicResponsiveListItemRenderer") ?: continue
+                            parseMusicResponsiveItem(item)?.let { tracks.add(it) }
+                        }
+                    }
+                }
+
+                // 2. itemSectionRenderer (categorized item sections)
+                val itemSection = secObj.optJSONObject("itemSectionRenderer")
+                if (itemSection != null) {
+                    val items = itemSection.optJSONArray("contents")
+                    if (items != null) {
+                        for (j in 0 until items.length()) {
+                            val item = items.optJSONObject(j)?.optJSONObject("musicResponsiveListItemRenderer") ?: continue
+                            parseMusicResponsiveItem(item)?.let { tracks.add(it) }
+                        }
+                    }
+                }
+
+                // 3. musicCardShelfRenderer (featured hero / top hit card)
+                val cardShelf = secObj.optJSONObject("musicCardShelfRenderer")
+                if (cardShelf != null) {
+                    val title = cardShelf.optJSONObject("title")?.optJSONArray("runs")?.optJSONObject(0)?.optString("text")
+                    val videoId = cardShelf.optJSONObject("onTap")?.optJSONObject("watchEndpoint")?.optString("videoId")
+                        ?: cardShelf.optJSONObject("title")?.optJSONArray("runs")?.optJSONObject(0)
+                            ?.optJSONObject("navigationEndpoint")?.optJSONObject("watchEndpoint")?.optString("videoId")
+
+                    if (!title.isNullOrEmpty() && !videoId.isNullOrEmpty()) {
+                        val artist = cardShelf.optJSONObject("subtitle")?.optJSONArray("runs")?.optJSONObject(0)?.optString("text") ?: "Unknown Artist"
+                        val thumbUrl = cardShelf.optJSONObject("thumbnail")?.optJSONObject("musicThumbnailRenderer")
+                            ?.optJSONObject("thumbnail")?.optJSONArray("thumbnails")
+                            ?.let { if (it.length() > 0) it.optJSONObject(it.length() - 1)?.optString("url") else null }
+                            ?: "https://i.ytimg.com/vi/$videoId/hqdefault.jpg"
+
+                        tracks.add(
+                            Track(
+                                id = videoId,
+                                title = title,
+                                artist = artist,
+                                thumbnailUrl = thumbUrl
+                            )
+                        )
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            logE("Error parsing search response: ${e.message}", e)
+        }
+        return tracks
+    }
+
+    private fun parseMusicResponsiveItem(item: JSONObject): Track? {
+        try {
+            val flexColumns = item.optJSONArray("flexColumns") ?: return null
+
+            // Title
+            val titleCol = flexColumns.optJSONObject(0)
+                ?.optJSONObject("musicResponsiveListItemFlexColumnRenderer")
+                ?.optJSONObject("text")
+                ?.optJSONArray("runs")
+            val title = titleCol?.optJSONObject(0)?.optString("text") ?: return null
+
+            // Video ID
+            val videoId = titleCol.optJSONObject(0)
+                ?.optJSONObject("navigationEndpoint")
+                ?.optJSONObject("watchEndpoint")
+                ?.optString("videoId")
+                ?: item.optJSONObject("doubleTapCommand")
+                    ?.optJSONObject("watchEndpoint")
+                    ?.optString("videoId")
+                ?: item.optJSONObject("playNavigationEndpoint")
+                    ?.optJSONObject("watchEndpoint")
+                    ?.optString("videoId")
+                ?: item.optJSONObject("overlay")
+                    ?.optJSONObject("musicItemThumbnailOverlayRenderer")
+                    ?.optJSONObject("content")
+                    ?.optJSONObject("musicPlayButtonRenderer")
+                    ?.optJSONObject("playNavigationEndpoint")
+                    ?.optJSONObject("watchEndpoint")
+                    ?.optString("videoId")
+                ?: return null
+
+            // Artist, Album, Duration
+            var artist = "Unknown Artist"
+            var album: String? = null
+            var durationSeconds = 0L
+
+            val subtitleCol = flexColumns.optJSONObject(1)
+                ?.optJSONObject("musicResponsiveListItemFlexColumnRenderer")
+                ?.optJSONObject("text")
+                ?.optJSONArray("runs")
+
+            if (subtitleCol != null) {
+                val textParts = mutableListOf<String>()
+                for (k in 0 until subtitleCol.length()) {
+                    val runText = subtitleCol.optJSONObject(k)?.optString("text") ?: ""
+                    if (runText.isNotEmpty() && runText != " • ") {
+                        textParts.add(runText)
+                    }
+                }
+
+                if (textParts.isNotEmpty()) {
+                    artist = textParts[0]
+                }
+                if (textParts.size > 2) {
+                    album = textParts[1]
+                    durationSeconds = parseDurationText(textParts.last())
+                } else if (textParts.size == 2) {
+                    val parsedDur = parseDurationText(textParts[1])
+                    if (parsedDur > 0) {
+                        durationSeconds = parsedDur
+                    } else {
+                        album = textParts[1]
+                    }
+                }
+            }
+
+            // Thumbnail
+            val thumbUrl = item.optJSONObject("thumbnail")
+                ?.optJSONObject("musicThumbnailRenderer")
+                ?.optJSONObject("thumbnail")
+                ?.optJSONArray("thumbnails")
+                ?.let { thumbs ->
+                    if (thumbs.length() > 0) thumbs.optJSONObject(thumbs.length() - 1)?.optString("url") else null
+                } ?: "https://i.ytimg.com/vi/$videoId/hqdefault.jpg"
+
+            return Track(
+                id = videoId,
+                title = title,
+                artist = artist,
+                album = album,
+                durationSeconds = durationSeconds,
+                thumbnailUrl = thumbUrl
+            )
+        } catch (_: Exception) {
+            return null
+        }
+    }
+
+    private fun parseDurationText(text: String): Long {
+        val parts = text.trim().split(":")
+        if (parts.size == 2) {
+            val min = parts[0].toLongOrNull() ?: 0L
+            val sec = parts[1].toLongOrNull() ?: 0L
+            return min * 60 + sec
+        } else if (parts.size == 3) {
+            val hr = parts[0].toLongOrNull() ?: 0L
+            val min = parts[1].toLongOrNull() ?: 0L
+            val sec = parts[2].toLongOrNull() ?: 0L
+            return hr * 3600 + min * 60 + sec
+        }
+        return 0L
+    }
+}

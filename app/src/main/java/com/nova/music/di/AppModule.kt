@@ -8,6 +8,7 @@ import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import com.nova.music.data.extractor.InnerTubeXExtractor
 import com.nova.music.data.extractor.YouTubeMusicExtractor
 import com.nova.music.data.repository.MusicRepositoryImpl
 import com.nova.music.domain.repository.MusicExtractor
@@ -70,9 +71,9 @@ val appModule = module {
             .build()
     }
 
-    // Extractor
+    // Extractor: InnerTubeX with multi-client fallback & QuackJS
     single<MusicExtractor> {
-        YouTubeMusicExtractor(httpClient = get())
+        InnerTubeXExtractor(okHttpClient = get())
     }
 
     // Repository
