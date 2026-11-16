@@ -3,6 +3,7 @@ package com.nova.music.playback
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.util.Log
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
@@ -10,7 +11,11 @@ import androidx.media3.common.MediaMetadata
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.util.Util
+import androidx.media3.datasource.HttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.analytics.AnalyticsListener
+import androidx.media3.exoplayer.source.LoadEventInfo
+import androidx.media3.exoplayer.source.MediaLoadData
 import com.nova.music.domain.model.PlaybackState
 import com.nova.music.domain.model.PlayerStatus
 import com.nova.music.domain.model.RepeatMode
@@ -26,6 +31,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import java.io.IOException
 
 class ExoPlayerController(
     private val context: Context,
@@ -79,6 +85,15 @@ class ExoPlayerController(
         }
 
         override fun onPlayerError(error: PlaybackException) {
+            val rootCause = error.cause
+            Log.e("NOVA_DIAGNOSTICS", "ExoPlayer onPlayerError: errorCode=${error.errorCodeName}(${error.errorCode}), message=${error.message}, cause=${rootCause?.javaClass?.name}: ${rootCause?.message}")
+            if (rootCause is HttpDataSource.InvalidResponseCodeException) {
+                Log.e("NOVA_DIAGNOSTICS", "HTTP Error Code: ${rootCause.responseCode}, responseMessage=${rootCause.responseMessage}")
+                val safeHeaders = rootCause.headerFields.filterKeys {
+                    it.contains("content", ignoreCase = true) || it.contains("x-", ignoreCase = true) || it.equals("server", ignoreCase = true)
+                }
+                Log.e("NOVA_DIAGNOSTICS", "Response headers: $safeHeaders")
+            }
             _playbackState.update {
                 it.copy(
                     status = PlayerStatus.ERROR,
@@ -91,6 +106,39 @@ class ExoPlayerController(
 
     init {
         exoPlayer.addListener(playerListener)
+        exoPlayer.addAnalyticsListener(object : AnalyticsListener {
+            override fun onLoadStarted(
+                eventTime: AnalyticsListener.EventTime,
+                loadEventInfo: LoadEventInfo,
+                mediaLoadData: MediaLoadData
+            ) {
+                val host = loadEventInfo.uri.host ?: "unknown"
+                Log.i("NOVA_DIAGNOSTICS", "ExoPlayer load started: host=$host, dataType=${mediaLoadData.dataType}")
+            }
+
+            override fun onLoadCompleted(
+                eventTime: AnalyticsListener.EventTime,
+                loadEventInfo: LoadEventInfo,
+                mediaLoadData: MediaLoadData
+            ) {
+                val host = loadEventInfo.uri.host ?: "unknown"
+                Log.i("NOVA_DIAGNOSTICS", "ExoPlayer load completed: host=$host, bytesLoaded=${loadEventInfo.bytesLoaded}, durationMs=${loadEventInfo.loadDurationMs}")
+            }
+
+            override fun onLoadError(
+                eventTime: AnalyticsListener.EventTime,
+                loadEventInfo: LoadEventInfo,
+                mediaLoadData: MediaLoadData,
+                error: IOException,
+                wasCanceled: Boolean
+            ) {
+                val host = loadEventInfo.uri.host ?: "unknown"
+                val responseHeaders = loadEventInfo.responseHeaders
+                val server = responseHeaders["Server"]?.firstOrNull() ?: "unknown"
+                val xGvs = responseHeaders["x-goog-generation"]?.firstOrNull()
+                Log.e("NOVA_DIAGNOSTICS", "ExoPlayer load error: host=$host, error=${error.javaClass.simpleName}: ${error.message}, server=$server, xGvs=$xGvs, wasCanceled=$wasCanceled")
+            }
+        })
     }
 
     private fun ensureServiceStarted() {
@@ -144,15 +192,24 @@ class ExoPlayerController(
     }
 
     private fun resolveAndPlay(track: Track) {
+        val requestStartTime = System.currentTimeMillis()
         scope.launch {
             if (track.streamUrl != null) {
+                Log.i("NOVA_DIAGNOSTICS", "Playing cached stream URL for track: ${track.id}")
                 playMediaUri(track, track.streamUrl)
             } else {
                 _playbackState.update { it.copy(status = PlayerStatus.BUFFERING) }
                 val streamResult = musicRepository.resolveStream(track.id)
+                val extractionDuration = System.currentTimeMillis() - requestStartTime
                 streamResult.onSuccess { stream ->
+                    val host = runCatching { Uri.parse(stream.url).host }.getOrNull() ?: "unknown"
+                    Log.i("NOVA_DIAGNOSTICS", "Stream resolved in ${extractionDuration}ms: host=$host, codec=${stream.codec}, bitrate=${stream.bitrate}")
+                    val playStart = System.currentTimeMillis()
                     playMediaUri(track, stream.url)
+                    val timeBetweenExtractionAndPlay = System.currentTimeMillis() - playStart
+                    Log.i("NOVA_DIAGNOSTICS", "Playback request dispatched to ExoPlayer in ${timeBetweenExtractionAndPlay}ms")
                 }.onFailure { error ->
+                    Log.e("NOVA_DIAGNOSTICS", "Stream resolution failed in ${extractionDuration}ms: ${error.message}")
                     _playbackState.update {
                         it.copy(
                             status = PlayerStatus.ERROR,

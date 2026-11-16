@@ -7,5 +7,6 @@ data class AudioStream(
     val bitrate: Int = 160000,
     val formatId: String = "251",
     val contentLength: Long = 0,
-    val isAudioOnly: Boolean = true
+    val isAudioOnly: Boolean = true,
+    val headers: Map<String, String> = emptyMap()
 )

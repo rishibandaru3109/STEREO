@@ -334,14 +334,34 @@ class YouTubeMusicExtractor(
         return tracks
     }
 
+    private fun logDiag(message: String) {
+        try {
+            android.util.Log.i("NOVA_DIAGNOSTICS", message)
+        } catch (_: Throwable) {
+            println("[NOVA_DIAGNOSTICS] $message")
+        }
+    }
+
+    private fun logDiagError(message: String) {
+        try {
+            android.util.Log.e("NOVA_DIAGNOSTICS", message)
+        } catch (_: Throwable) {
+            System.err.println("[NOVA_DIAGNOSTICS] ERROR: $message")
+        }
+    }
+
     override suspend fun resolveAudioStream(trackId: String): Result<AudioStream> = withContext(Dispatchers.IO) {
+        val startTime = System.currentTimeMillis()
         try {
             val stream = resolveWithWebRemix(trackId)
+            val elapsed = System.currentTimeMillis() - startTime
             if (stream != null) {
+                logDiag("Stream resolved successfully in ${elapsed}ms for track: $trackId (codec=${stream.codec}, itag=${stream.formatId})")
                 return@withContext Result.success(stream)
             }
         } catch (e: Exception) {
-            // Log or fallback
+            val elapsed = System.currentTimeMillis() - startTime
+            logDiagError("Stream resolution failed after ${elapsed}ms for track $trackId: ${e.message}")
         }
 
         Result.failure(IOException("Could not resolve playable audio stream for track: $trackId"))
@@ -436,6 +456,15 @@ class YouTubeMusicExtractor(
             )
             .firstOrNull() ?: return null
 
+        logDiag("Format candidate selected: itag=${bestCandidate.itag}, codec=${bestCandidate.codec}, bitrate=${bestCandidate.bitrate}, contentLength=${bestCandidate.contentLength}, hasDirectUrl=${bestCandidate.directUrl != null}")
+
+        val streamHeaders = mapOf(
+            "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+            "Referer" to "https://music.youtube.com/",
+            "Origin" to "https://music.youtube.com",
+            "Accept" to "*/*"
+        )
+
         // If direct URL is available without cipher, return directly
         if (!bestCandidate.directUrl.isNullOrEmpty()) {
             return AudioStream(
@@ -445,7 +474,8 @@ class YouTubeMusicExtractor(
                 bitrate = bestCandidate.bitrate,
                 formatId = bestCandidate.itag,
                 contentLength = bestCandidate.contentLength,
-                isAudioOnly = true
+                isAudioOnly = true,
+                headers = streamHeaders
             )
         }
 
@@ -459,7 +489,8 @@ class YouTubeMusicExtractor(
             bitrate = bestCandidate.bitrate,
             formatId = bestCandidate.itag,
             contentLength = bestCandidate.contentLength,
-            isAudioOnly = true
+            isAudioOnly = true,
+            headers = streamHeaders
         )
     }
 
@@ -470,23 +501,41 @@ class YouTubeMusicExtractor(
             val rawUrl = params["url"] ?: return null
             val sigParam = params["sp"] ?: "sig"
 
-            val httpUrl = rawUrl.toHttpUrlOrNull() ?: return null
-            val rawN = httpUrl.queryParameter("n")
-
             val program = getOrCompileProgram() ?: return null
             val decipheredSig = program.decipherSignature(encryptedSig)
-            val transformedN = if (rawN != null) program.transformN(rawN) else null
 
-            val urlBuilder = httpUrl.newBuilder()
-            if (rawN != null && transformedN != null) {
-                urlBuilder.removeAllQueryParameters("n")
-                urlBuilder.addQueryParameter("n", transformedN)
+            // 1. In-place regex substitution of 'n' parameter to preserve exact parameter sequence and encoding
+            val nRegex = Regex("[&?](?:n|%6[eE])=([^&#]+)")
+            val match = nRegex.find(rawUrl)
+            var nTransformed = false
+            val urlWithN = if (match != null) {
+                val rawN = URLDecoder.decode(match.groupValues[1], "UTF-8")
+                val nResult = program.transformN(rawN)
+                if (nResult.isNotBlank() && nResult != rawN && !nResult.startsWith("enhanced_except_")) {
+                    nTransformed = true
+                    val start = match.range.last + 1 - match.groupValues[1].length
+                    rawUrl.replaceRange(start, match.range.last + 1, java.net.URLEncoder.encode(nResult, "UTF-8"))
+                } else {
+                    rawUrl
+                }
+            } else {
+                rawUrl
             }
-            urlBuilder.removeAllQueryParameters(sigParam)
-            urlBuilder.addQueryParameter(sigParam, decipheredSig)
 
-            return urlBuilder.build().toString()
-        } catch (_: Exception) {
+            // 2. Safely append deciphered signature without re-encoding existing parameters
+            val separator = if (urlWithN.contains("?")) "&" else "?"
+            val finalUrl = "$urlWithN$separator$sigParam=${java.net.URLEncoder.encode(decipheredSig, "UTF-8")}"
+
+            // 3. Safe non-sensitive diagnostic logging (host, non-sensitive parameters only)
+            val host = runCatching { java.net.URI(finalUrl).host }.getOrNull() ?: "unknown"
+            val hasSig = finalUrl.contains("sig=") || finalUrl.contains("signature=")
+            val itag = runCatching { Regex("[?&]itag=([^&]+)").find(finalUrl)?.groupValues?.get(1) }.getOrNull()
+            val expire = runCatching { Regex("[?&]expire=([^&]+)").find(finalUrl)?.groupValues?.get(1) }.getOrNull()
+            logDiag("Deciphered stream URL: host=$host, itag=$itag, expire=$expire, hasSig=$hasSig, nTransformed=$nTransformed")
+
+            return finalUrl
+        } catch (e: Exception) {
+            logDiagError("decipherMediaUrl error: ${e.message}")
             return null
         }
     }
