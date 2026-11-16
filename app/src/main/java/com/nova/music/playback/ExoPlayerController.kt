@@ -1,12 +1,15 @@
 package com.nova.music.playback
 
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.common.util.Util
 import androidx.media3.exoplayer.ExoPlayer
 import com.nova.music.domain.model.PlaybackState
 import com.nova.music.domain.model.PlayerStatus
@@ -26,7 +29,8 @@ import kotlinx.coroutines.launch
 
 class ExoPlayerController(
     private val context: Context,
-    private val musicRepository: MusicRepository
+    private val musicRepository: MusicRepository,
+    private val exoPlayer: ExoPlayer
 ) : NovaPlayerController {
 
     private val scope = CoroutineScope(Dispatchers.Main + Job())
@@ -35,68 +39,71 @@ class ExoPlayerController(
     private val _playbackState = MutableStateFlow(PlaybackState())
     override val playbackState: StateFlow<PlaybackState> = _playbackState.asStateFlow()
 
-    private val exoPlayer: ExoPlayer = ExoPlayer.Builder(context)
-        .setAudioAttributes(
-            AudioAttributes.Builder()
-                .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
-                .setUsage(C.USAGE_MEDIA)
-                .build(),
-            true // handleAudioFocus
-        )
-        .setHandleAudioBecomingNoisy(true)
-        .build().apply {
-            addListener(object : Player.Listener {
-                override fun onPlaybackStateChanged(playbackState: Int) {
-                    when (playbackState) {
-                        Player.STATE_BUFFERING -> {
-                            _playbackState.update { it.copy(status = PlayerStatus.BUFFERING) }
-                        }
-                        Player.STATE_READY -> {
-                            val duration = exoPlayer.duration.coerceAtLeast(0L)
-                            _playbackState.update {
-                                it.copy(
-                                    status = if (exoPlayer.isPlaying) PlayerStatus.PLAYING else PlayerStatus.PAUSED,
-                                    durationMs = duration
-                                )
-                            }
-                        }
-                        Player.STATE_ENDED -> {
-                            _playbackState.update { it.copy(status = PlayerStatus.ENDED, isPlaying = false) }
-                            handleTrackEnded()
-                        }
-                        Player.STATE_IDLE -> {
-                            _playbackState.update { it.copy(status = PlayerStatus.IDLE) }
-                        }
-                    }
+    private val playerListener = object : Player.Listener {
+        override fun onPlaybackStateChanged(playbackState: Int) {
+            when (playbackState) {
+                Player.STATE_BUFFERING -> {
+                    _playbackState.update { it.copy(status = PlayerStatus.BUFFERING) }
                 }
-
-                override fun onIsPlayingChanged(isPlaying: Boolean) {
+                Player.STATE_READY -> {
+                    val duration = exoPlayer.duration.coerceAtLeast(0L)
                     _playbackState.update {
                         it.copy(
-                            isPlaying = isPlaying,
-                            status = if (isPlaying) PlayerStatus.PLAYING else if (it.status == PlayerStatus.PLAYING) PlayerStatus.PAUSED else it.status
-                        )
-                    }
-                    if (isPlaying) {
-                        startProgressUpdates()
-                    } else {
-                        stopProgressUpdates()
-                    }
-                }
-
-                override fun onPlayerError(error: PlaybackException) {
-                    _playbackState.update {
-                        it.copy(
-                            status = PlayerStatus.ERROR,
-                            isPlaying = false,
-                            errorMessage = error.localizedMessage ?: "Playback error: ${error.errorCodeName}"
+                            status = if (exoPlayer.isPlaying) PlayerStatus.PLAYING else PlayerStatus.PAUSED,
+                            durationMs = duration
                         )
                     }
                 }
-            })
+                Player.STATE_ENDED -> {
+                    _playbackState.update { it.copy(status = PlayerStatus.ENDED, isPlaying = false) }
+                    handleTrackEnded()
+                }
+                Player.STATE_IDLE -> {
+                    _playbackState.update { it.copy(status = PlayerStatus.IDLE) }
+                }
+            }
         }
 
+        override fun onIsPlayingChanged(isPlaying: Boolean) {
+            _playbackState.update {
+                it.copy(
+                    isPlaying = isPlaying,
+                    status = if (isPlaying) PlayerStatus.PLAYING else if (it.status == PlayerStatus.PLAYING) PlayerStatus.PAUSED else it.status
+                )
+            }
+            if (isPlaying) {
+                startProgressUpdates()
+            } else {
+                stopProgressUpdates()
+            }
+        }
+
+        override fun onPlayerError(error: PlaybackException) {
+            _playbackState.update {
+                it.copy(
+                    status = PlayerStatus.ERROR,
+                    isPlaying = false,
+                    errorMessage = error.localizedMessage ?: "Playback error: ${error.errorCodeName}"
+                )
+            }
+        }
+    }
+
+    init {
+        exoPlayer.addListener(playerListener)
+    }
+
+    private fun ensureServiceStarted() {
+        try {
+            val intent = Intent(context, NovaMediaSessionService::class.java)
+            Util.startForegroundService(context, intent)
+        } catch (_: Exception) {
+            // Foreground service launch handled gracefully
+        }
+    }
+
     override fun playTrack(track: Track) {
+        ensureServiceStarted()
         val currentQueue = _playbackState.value.queue
         val existingIndex = currentQueue.indexOfFirst { it.id == track.id }
         val newQueue = if (existingIndex >= 0) currentQueue else currentQueue + track
@@ -118,6 +125,7 @@ class ExoPlayerController(
 
     override fun setQueue(tracks: List<Track>, startIndex: Int) {
         if (tracks.isEmpty()) return
+        ensureServiceStarted()
         val validIndex = startIndex.coerceIn(0, tracks.size - 1)
         val track = tracks[validIndex]
 
@@ -161,6 +169,7 @@ class ExoPlayerController(
             .setTitle(track.title)
             .setArtist(track.artist)
             .setAlbumTitle(track.album)
+            .setArtworkUri(if (track.thumbnailUrl.isNotBlank()) Uri.parse(track.thumbnailUrl) else null)
             .build()
 
         val mediaItem = MediaItem.Builder()
@@ -278,6 +287,7 @@ class ExoPlayerController(
 
     override fun release() {
         stopProgressUpdates()
+        exoPlayer.removeListener(playerListener)
         exoPlayer.release()
     }
 }

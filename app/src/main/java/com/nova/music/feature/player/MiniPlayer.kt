@@ -38,11 +38,10 @@ import coil.compose.AsyncImage
 import com.nova.music.core.designsystem.theme.DarkSurface
 import com.nova.music.core.designsystem.theme.DarkSurfaceHighlight
 import com.nova.music.core.designsystem.theme.NovaCyan
-import com.nova.music.core.designsystem.theme.PlayerStatus
 import com.nova.music.core.designsystem.theme.PureBlack
 import com.nova.music.core.designsystem.theme.TextPrimary
 import com.nova.music.core.designsystem.theme.TextSecondary
-import com.nova.music.domain.model.PlayerStatus as DomainPlayerStatus
+import com.nova.music.domain.model.PlayerStatus
 
 @Composable
 fun MiniPlayer(
@@ -128,7 +127,7 @@ fun MiniPlayer(
                 Spacer(modifier = Modifier.width(8.dp))
 
                 // Play / Pause or Buffering
-                if (state.status == DomainPlayerStatus.BUFFERING) {
+                if (state.status == PlayerStatus.BUFFERING) {
                     CircularProgressIndicator(
                         modifier = Modifier.size(32.dp),
                         color = NovaCyan,

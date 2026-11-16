@@ -5,19 +5,33 @@ import com.nova.music.domain.model.Track
 import com.nova.music.domain.repository.MusicExtractor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import meow.nyx.quackjs.PlayerHints
+import meow.nyx.quackjs.PlayerProgram
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
-import org.json.JSONArray
 import org.json.JSONObject
 import java.io.IOException
+import java.net.URLDecoder
 
 class YouTubeMusicExtractor(
     private val httpClient: OkHttpClient
 ) : MusicExtractor {
 
     private val jsonMediaType = "application/json; charset=utf-8".toMediaType()
+
+    @Volatile
+    private var cachedProgram: PlayerProgram? = null
+    private val programLock = Any()
+
+    companion object {
+        private const val DEFAULT_STS = 20772
+        private const val DEFAULT_SIG_EXPR = "Pl(16,2515,INPUT)"
+        private const val DEFAULT_N_CLASS = "Ol"
+        private const val BASE_JS_URL = "https://www.youtube.com/s/player/907ce1cd/player_ias.vflset/en_GB/base.js"
+    }
 
     override suspend fun search(query: String): Result<List<Track>> = withContext(Dispatchers.IO) {
         try {
@@ -35,7 +49,6 @@ class YouTubeMusicExtractor(
 
             Result.success(emptyList())
         } catch (e: Exception) {
-            // If primary network calls fail, attempt fallback
             try {
                 val androidResults = searchYouTubeAndroid(query)
                 Result.success(androidResults)
@@ -45,7 +58,7 @@ class YouTubeMusicExtractor(
         }
     }
 
-    private fun searchYouTubeMusic(query: String): List<Track> {
+    private fun searchYouTubeMusic(query: String, filterSongs: Boolean = true): List<Track> {
         val url = "https://music.youtube.com/youtubei/v1/search"
         val requestBody = JSONObject().apply {
             put("context", JSONObject().apply {
@@ -57,13 +70,15 @@ class YouTubeMusicExtractor(
                 })
             })
             put("query", query)
-            // Song filter param
-            put("params", "Eg-KAQwIABAAGAAgACgAMABqChAEEAMQCRAFEAo%3D")
+            if (filterSongs) {
+                // Song filter param (Base64 decoded value, do not percent-encode in JSON)
+                put("params", "EgWKAQIIAWoKEAMQBBAJEAoQBQ==")
+            }
         }.toString().toRequestBody(jsonMediaType)
 
         val request = Request.Builder()
             .url(url)
-            .addHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:128.0) Gecko/20100101 Firefox/128.0")
+            .addHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36")
             .addHeader("X-YouTube-Client-Name", "67")
             .addHeader("X-YouTube-Client-Version", "1.20240722.01.00")
             .addHeader("Referer", "https://music.youtube.com/")
@@ -73,7 +88,12 @@ class YouTubeMusicExtractor(
         httpClient.newCall(request).execute().use { response ->
             if (!response.isSuccessful) return emptyList()
             val body = response.body?.string() ?: return emptyList()
-            return parseMusicSearchResponse(body)
+            val tracks = parseMusicSearchResponse(body)
+            if (tracks.isEmpty() && filterSongs) {
+                // Try unfiltered search if song-filtered returned empty
+                return searchYouTubeMusic(query, filterSongs = false)
+            }
+            return tracks
         }
     }
 
@@ -91,14 +111,55 @@ class YouTubeMusicExtractor(
                 ?.optJSONArray("contents") ?: return emptyList()
 
             for (i in 0 until contents.length()) {
-                val section = contents.optJSONObject(i)?.optJSONObject("musicShelfRenderer") ?: continue
-                val items = section.optJSONArray("contents") ?: continue
+                val secObj = contents.optJSONObject(i) ?: continue
 
-                for (j in 0 until items.length()) {
-                    val item = items.optJSONObject(j)?.optJSONObject("musicResponsiveListItemRenderer") ?: continue
-                    val track = parseMusicResponsiveItem(item)
-                    if (track != null) {
-                        tracks.add(track)
+                // 1. musicShelfRenderer (standard search results shelf)
+                val musicShelf = secObj.optJSONObject("musicShelfRenderer")
+                if (musicShelf != null) {
+                    val items = musicShelf.optJSONArray("contents")
+                    if (items != null) {
+                        for (j in 0 until items.length()) {
+                            val item = items.optJSONObject(j)?.optJSONObject("musicResponsiveListItemRenderer") ?: continue
+                            parseMusicResponsiveItem(item)?.let { tracks.add(it) }
+                        }
+                    }
+                }
+
+                // 2. itemSectionRenderer (categorized/tabbed item sections)
+                val itemSection = secObj.optJSONObject("itemSectionRenderer")
+                if (itemSection != null) {
+                    val items = itemSection.optJSONArray("contents")
+                    if (items != null) {
+                        for (j in 0 until items.length()) {
+                            val item = items.optJSONObject(j)?.optJSONObject("musicResponsiveListItemRenderer") ?: continue
+                            parseMusicResponsiveItem(item)?.let { tracks.add(it) }
+                        }
+                    }
+                }
+
+                // 3. musicCardShelfRenderer (featured hero / top hit card)
+                val cardShelf = secObj.optJSONObject("musicCardShelfRenderer")
+                if (cardShelf != null) {
+                    val title = cardShelf.optJSONObject("title")?.optJSONArray("runs")?.optJSONObject(0)?.optString("text")
+                    val videoId = cardShelf.optJSONObject("onTap")?.optJSONObject("watchEndpoint")?.optString("videoId")
+                        ?: cardShelf.optJSONObject("title")?.optJSONArray("runs")?.optJSONObject(0)
+                            ?.optJSONObject("navigationEndpoint")?.optJSONObject("watchEndpoint")?.optString("videoId")
+
+                    if (!title.isNullOrEmpty() && !videoId.isNullOrEmpty()) {
+                        val artist = cardShelf.optJSONObject("subtitle")?.optJSONArray("runs")?.optJSONObject(0)?.optString("text") ?: "Unknown Artist"
+                        val thumbUrl = cardShelf.optJSONObject("thumbnail")?.optJSONObject("musicThumbnailRenderer")
+                            ?.optJSONObject("thumbnail")?.optJSONArray("thumbnails")
+                            ?.let { if (it.length() > 0) it.optJSONObject(it.length() - 1)?.optString("url") else null }
+                            ?: "https://i.ytimg.com/vi/$videoId/hqdefault.jpg"
+
+                        tracks.add(
+                            Track(
+                                id = videoId,
+                                title = title,
+                                artist = artist,
+                                thumbnailUrl = thumbUrl
+                            )
+                        )
                     }
                 }
             }
@@ -112,23 +173,29 @@ class YouTubeMusicExtractor(
         val flexColumns = item.optJSONArray("flexColumns") ?: return null
         if (flexColumns.length() == 0) return null
 
-        // 1. Title & VideoId
-        val col0 = flexColumns.optJSONObject(0)
+        // 1. Title & VideoId from Column 0
+        val col0Runs = flexColumns.optJSONObject(0)
             ?.optJSONObject("musicResponsiveListItemFlexColumnRenderer")
             ?.optJSONObject("text")
             ?.optJSONArray("runs") ?: return null
 
-        val titleRun = col0.optJSONObject(0) ?: return null
-        val title = titleRun.optString("text")
+        if (col0Runs.length() == 0) return null
+        val titleRun = col0Runs.optJSONObject(0) ?: return null
+        val title = titleRun.optString("text").ifEmpty { return null }
+
         val videoId = titleRun.optJSONObject("navigationEndpoint")
             ?.optJSONObject("watchEndpoint")
             ?.optString("videoId")
             ?.ifEmpty { null }
             ?: item.optJSONObject("playlistItemData")?.optString("videoId")?.ifEmpty { null }
             ?: item.optJSONObject("doubleTapCommand")?.optJSONObject("watchEndpoint")?.optString("videoId")?.ifEmpty { null }
-            ?: return null
+            ?: item.optJSONObject("overlay")?.optJSONObject("musicItemThumbnailOverlayRenderer")
+                ?.optJSONObject("content")?.optJSONObject("musicPlayButtonRenderer")
+                ?.optJSONObject("playNavigationEndpoint")?.optJSONObject("watchEndpoint")
+                ?.optString("videoId")?.ifEmpty { null }
+            ?: return null // Skip artist/album navigation items without playable tracks
 
-        // 2. Artist, Album, Duration from column 1
+        // 2. Artist & Album from Column 1
         var artist = "Unknown Artist"
         var album: String? = null
         var durationSeconds = 0L
@@ -140,17 +207,31 @@ class YouTubeMusicExtractor(
                 ?.optJSONArray("runs")
 
             if (col1Runs != null && col1Runs.length() > 0) {
-                artist = col1Runs.optJSONObject(0)?.optString("text") ?: "Unknown Artist"
-                if (col1Runs.length() > 2) {
-                    val possibleAlbum = col1Runs.optJSONObject(2)?.optString("text")
-                    if (possibleAlbum != null && !possibleAlbum.contains(":")) {
-                        album = possibleAlbum
+                val runTexts = mutableListOf<String>()
+                for (k in 0 until col1Runs.length()) {
+                    val t = col1Runs.optJSONObject(k)?.optString("text")?.trim() ?: ""
+                    if (t.isNotEmpty() && t != "•" && t != "·") {
+                        runTexts.add(t)
+                    }
+                }
+
+                if (runTexts.isNotEmpty()) {
+                    if (runTexts[0].equals("Song", ignoreCase = true) && runTexts.size > 1) {
+                        artist = runTexts[1]
+                        if (runTexts.size > 2 && !runTexts[2].contains(":")) {
+                            album = runTexts[2]
+                        }
+                    } else {
+                        artist = runTexts[0]
+                        if (runTexts.size > 1 && !runTexts[1].contains(":")) {
+                            album = runTexts[1]
+                        }
                     }
                 }
             }
         }
 
-        // Duration from fixed column if present
+        // 3. Duration from fixed column if present
         val fixedColumns = item.optJSONArray("fixedColumns")
         if (fixedColumns != null && fixedColumns.length() > 0) {
             val durText = fixedColumns.optJSONObject(0)
@@ -162,7 +243,7 @@ class YouTubeMusicExtractor(
             durationSeconds = parseDurationToSeconds(durText)
         }
 
-        // 3. Thumbnail
+        // 4. Thumbnail
         val thumbnails = item.optJSONObject("thumbnail")
             ?.optJSONObject("musicThumbnailRenderer")
             ?.optJSONObject("thumbnail")
@@ -254,167 +335,204 @@ class YouTubeMusicExtractor(
     }
 
     override suspend fun resolveAudioStream(trackId: String): Result<AudioStream> = withContext(Dispatchers.IO) {
-        // 1. Try iOS Client (returns clean, direct audio stream URLs without signature cipher)
         try {
-            val iosStream = resolveWithClient(trackId, clientName = "IOS", clientVersion = "19.29.1", deviceModel = "iPhone16,2")
-            if (iosStream != null) {
-                return@withContext Result.success(iosStream)
+            val stream = resolveWithWebRemix(trackId)
+            if (stream != null) {
+                return@withContext Result.success(stream)
             }
-        } catch (_: Exception) {}
-
-        // 2. Try Android Client
-        try {
-            val androidStream = resolveWithClient(trackId, clientName = "ANDROID", clientVersion = "19.29.37", sdkVersion = 34)
-            if (androidStream != null) {
-                return@withContext Result.success(androidStream)
-            }
-        } catch (_: Exception) {}
-
-        // 3. Try Piped API Public Resolvers as reliable secondary fallback
-        val pipedInstances = listOf(
-            "https://pipedapi.kavin.rocks",
-            "https://api.piped.private.coffee",
-            "https://pipedapi.tokhmi.xyz"
-        )
-        for (instance in pipedInstances) {
-            try {
-                val stream = resolveWithPiped(instance, trackId)
-                if (stream != null) {
-                    return@withContext Result.success(stream)
-                }
-            } catch (_: Exception) {}
+        } catch (e: Exception) {
+            // Log or fallback
         }
 
         Result.failure(IOException("Could not resolve playable audio stream for track: $trackId"))
     }
 
-    private fun resolveWithClient(
-        trackId: String,
-        clientName: String,
-        clientVersion: String,
-        deviceModel: String? = null,
-        sdkVersion: Int? = null
-    ): AudioStream? {
-        val url = "https://www.youtube.com/youtubei/v1/player"
-        val clientObj = JSONObject().apply {
-            put("clientName", clientName)
-            put("clientVersion", clientVersion)
-            put("hl", "en")
-            put("gl", "US")
-            if (deviceModel != null) put("deviceModel", deviceModel)
-            if (sdkVersion != null) put("androidSdkVersion", sdkVersion)
-        }
-
+    private fun resolveWithWebRemix(trackId: String): AudioStream? {
+        val url = "https://music.youtube.com/youtubei/v1/player"
         val requestBody = JSONObject().apply {
             put("context", JSONObject().apply {
-                put("client", clientObj)
+                put("client", JSONObject().apply {
+                    put("clientName", "WEB_REMIX")
+                    put("clientVersion", "1.20240722.01.00")
+                    put("hl", "en")
+                    put("gl", "US")
+                })
             })
             put("videoId", trackId)
-            put("contentCheckOk", true)
-            put("racyCheckOk", true)
+            put("playbackContext", JSONObject().apply {
+                put("contentPlaybackContext", JSONObject().apply {
+                    put("signatureTimestamp", DEFAULT_STS)
+                })
+            })
         }.toString().toRequestBody(jsonMediaType)
 
         val request = Request.Builder()
             .url(url)
-            .addHeader("User-Agent", "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X)")
+            .addHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36")
+            .addHeader("Referer", "https://music.youtube.com/")
+            .addHeader("X-YouTube-Client-Name", "67")
+            .addHeader("X-YouTube-Client-Version", "1.20240722.01.00")
             .post(requestBody)
             .build()
 
         httpClient.newCall(request).execute().use { response ->
             if (!response.isSuccessful) return null
             val body = response.body?.string() ?: return null
-            return selectBestAudioStream(body)
+            return selectAndDecipherAudioStream(body)
         }
     }
 
-    private fun selectBestAudioStream(jsonStr: String): AudioStream? {
+    private fun selectAndDecipherAudioStream(jsonStr: String): AudioStream? {
         val root = JSONObject(jsonStr)
         val streamingData = root.optJSONObject("streamingData") ?: return null
         val formats = streamingData.optJSONArray("adaptiveFormats") ?: return null
 
-        val audioFormats = mutableListOf<AudioStream>()
+        data class CandidateFormat(
+            val directUrl: String?,
+            val cipher: String?,
+            val mimeType: String,
+            val codec: String,
+            val bitrate: Int,
+            val itag: String,
+            val contentLength: Long
+        )
+
+        val candidates = mutableListOf<CandidateFormat>()
         for (i in 0 until formats.length()) {
             val format = formats.optJSONObject(i) ?: continue
             val mimeType = format.optString("mimeType")
             if (!mimeType.startsWith("audio/")) continue
 
-            val directUrl = format.optString("url")
-            if (directUrl.isEmpty()) continue // Skip cipher-encrypted formats without transform
+            val directUrl = format.optString("url").ifEmpty { null }
+            val cipher = format.optString("signatureCipher").ifEmpty {
+                format.optString("cipher").ifEmpty { null }
+            }
+
+            if (directUrl == null && cipher == null) continue
 
             val bitrate = format.optInt("bitrate", 128000)
             val itag = format.optInt("itag", 0).toString()
             val contentLength = format.optLong("contentLength", 0L)
             val isOpus = mimeType.contains("opus")
 
-            audioFormats.add(
-                AudioStream(
-                    url = directUrl,
+            candidates.add(
+                CandidateFormat(
+                    directUrl = directUrl,
+                    cipher = cipher,
                     mimeType = mimeType,
                     codec = if (isOpus) "opus" else "aac",
                     bitrate = bitrate,
-                    formatId = itag,
-                    contentLength = contentLength,
-                    isAudioOnly = true
+                    itag = itag,
+                    contentLength = contentLength
                 )
             )
         }
 
-        // Selection priority:
-        // 1. Opus format with highest bitrate (typically itag 251 @ ~160kbps)
-        // 2. Highest bitrate audio format available
-        return audioFormats
+        // Selection priority: Opus format with highest bitrate (itag 251), then AAC (itag 140)
+        val bestCandidate = candidates
             .sortedWith(
-                compareByDescending<AudioStream> { it.codec == "opus" }
+                compareByDescending<CandidateFormat> { it.codec == "opus" }
                     .thenByDescending { it.bitrate }
             )
-            .firstOrNull()
+            .firstOrNull() ?: return null
+
+        // If direct URL is available without cipher, return directly
+        if (!bestCandidate.directUrl.isNullOrEmpty()) {
+            return AudioStream(
+                url = bestCandidate.directUrl,
+                mimeType = bestCandidate.mimeType,
+                codec = bestCandidate.codec,
+                bitrate = bestCandidate.bitrate,
+                formatId = bestCandidate.itag,
+                contentLength = bestCandidate.contentLength,
+                isAudioOnly = true
+            )
+        }
+
+        // Decipher signature and transform N parameter
+        val playableUrl = decipherMediaUrl(bestCandidate.cipher ?: return null) ?: return null
+
+        return AudioStream(
+            url = playableUrl,
+            mimeType = bestCandidate.mimeType,
+            codec = bestCandidate.codec,
+            bitrate = bestCandidate.bitrate,
+            formatId = bestCandidate.itag,
+            contentLength = bestCandidate.contentLength,
+            isAudioOnly = true
+        )
     }
 
-    private fun resolveWithPiped(instance: String, trackId: String): AudioStream? {
-        val request = Request.Builder()
-            .url("$instance/streams/$trackId")
-            .build()
+    private fun decipherMediaUrl(cipherString: String): String? {
+        try {
+            val params = parseQueryString(cipherString)
+            val encryptedSig = params["s"] ?: return null
+            val rawUrl = params["url"] ?: return null
+            val sigParam = params["sp"] ?: "sig"
 
-        httpClient.newCall(request).execute().use { response ->
-            if (!response.isSuccessful) return null
-            val body = response.body?.string() ?: return null
-            val json = JSONObject(body)
-            val audioStreams = json.optJSONArray("audioStreams") ?: return null
+            val httpUrl = rawUrl.toHttpUrlOrNull() ?: return null
+            val rawN = httpUrl.queryParameter("n")
 
-            val streams = mutableListOf<AudioStream>()
-            for (i in 0 until audioStreams.length()) {
-                val s = audioStreams.optJSONObject(i) ?: continue
-                val streamUrl = s.optString("url")
-                if (streamUrl.isEmpty()) continue
+            val program = getOrCompileProgram() ?: return null
+            val decipheredSig = program.decipherSignature(encryptedSig)
+            val transformedN = if (rawN != null) program.transformN(rawN) else null
 
-                val mimeType = s.optString("mimeType", "audio/webm")
-                val bitrate = s.optInt("bitrate", 128000)
-                val codec = s.optString("codec", "opus")
-                val formatId = s.optString("format", "251")
-
-                streams.add(
-                    AudioStream(
-                        url = streamUrl,
-                        mimeType = mimeType,
-                        codec = codec,
-                        bitrate = bitrate,
-                        formatId = formatId,
-                        isAudioOnly = true
-                    )
-                )
+            val urlBuilder = httpUrl.newBuilder()
+            if (rawN != null && transformedN != null) {
+                urlBuilder.removeAllQueryParameters("n")
+                urlBuilder.addQueryParameter("n", transformedN)
             }
+            urlBuilder.removeAllQueryParameters(sigParam)
+            urlBuilder.addQueryParameter(sigParam, decipheredSig)
 
-            return streams
-                .sortedWith(
-                    compareByDescending<AudioStream> { it.codec.contains("opus") }
-                        .thenByDescending { it.bitrate }
-                )
-                .firstOrNull()
+            return urlBuilder.build().toString()
+        } catch (_: Exception) {
+            return null
         }
+    }
+
+    private fun getOrCompileProgram(): PlayerProgram? {
+        cachedProgram?.let { return it }
+
+        synchronized(programLock) {
+            cachedProgram?.let { return it }
+
+            try {
+                val request = Request.Builder()
+                    .url(BASE_JS_URL)
+                    .addHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
+                    .build()
+
+                httpClient.newCall(request).execute().use { response ->
+                    if (!response.isSuccessful) return null
+                    val js = response.body?.string() ?: return null
+
+                    val hints = PlayerHints(DEFAULT_SIG_EXPR, DEFAULT_N_CLASS, DEFAULT_STS)
+                    val program = PlayerProgram.Companion.compile(js, hints)
+                    cachedProgram = program
+                    return program
+                }
+            } catch (_: Exception) {
+                return null
+            }
+        }
+    }
+
+    private fun parseQueryString(query: String): Map<String, String> {
+        val result = mutableMapOf<String, String>()
+        val pairs = query.split("&")
+        for (pair in pairs) {
+            val idx = pair.indexOf("=")
+            if (idx > 0) {
+                val key = URLDecoder.decode(pair.substring(0, idx), "UTF-8")
+                val value = URLDecoder.decode(pair.substring(idx + 1), "UTF-8")
+                result[key] = value
+            }
+        }
+        return result
     }
 
     override suspend fun getTrackDetails(trackId: String): Result<Track> = withContext(Dispatchers.IO) {
-        // Fast track detail lookup
         Result.success(
             Track(
                 id = trackId,

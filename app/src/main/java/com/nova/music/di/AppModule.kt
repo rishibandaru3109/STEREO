@@ -1,5 +1,8 @@
 package com.nova.music.di
 
+import androidx.media3.common.AudioAttributes
+import androidx.media3.common.C
+import androidx.media3.exoplayer.ExoPlayer
 import com.nova.music.data.extractor.YouTubeMusicExtractor
 import com.nova.music.data.repository.MusicRepositoryImpl
 import com.nova.music.domain.repository.MusicExtractor
@@ -40,11 +43,26 @@ val appModule = module {
         MusicRepositoryImpl(extractor = get())
     }
 
-    // Playback Engine
+    // Media3 ExoPlayer Engine (shared singleton)
+    single<ExoPlayer> {
+        ExoPlayer.Builder(androidContext())
+            .setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
+                    .setUsage(C.USAGE_MEDIA)
+                    .build(),
+                true // handleAudioFocus = true
+            )
+            .setHandleAudioBecomingNoisy(true)
+            .build()
+    }
+
+    // Playback Controller
     single<NovaPlayerController> {
         ExoPlayerController(
             context = androidContext(),
-            musicRepository = get()
+            musicRepository = get(),
+            exoPlayer = get()
         )
     }
 
