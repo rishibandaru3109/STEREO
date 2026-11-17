@@ -8,13 +8,22 @@ import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.room.Room
+import com.nova.music.core.database.StereoDatabase
+import com.nova.music.core.database.dao.HistoryDao
+import com.nova.music.core.database.dao.LikedSongDao
+import com.nova.music.core.database.dao.PlaylistDao
+import com.nova.music.core.database.dao.QueueDao
+import com.nova.music.core.database.dao.TrackDao
 import com.nova.music.core.designsystem.theme.ThemePreferencesRepository
 import com.nova.music.core.designsystem.theme.ThemeRepository
 import com.nova.music.core.designsystem.wallpaper.WallpaperPreferencesRepository
 import com.nova.music.core.designsystem.wallpaper.WallpaperRepository
 import com.nova.music.data.extractor.InnerTubeXExtractor
 import com.nova.music.data.extractor.YouTubeMusicExtractor
+import com.nova.music.data.repository.LikedSongsRepositoryImpl
 import com.nova.music.data.repository.MusicRepositoryImpl
+import com.nova.music.domain.repository.LikedSongsRepository
 import com.nova.music.domain.repository.MusicExtractor
 import com.nova.music.domain.repository.MusicRepository
 import com.nova.music.feature.player.PlayerViewModel
@@ -85,6 +94,28 @@ val appModule = module {
     // Repository
     single<MusicRepository> {
         MusicRepositoryImpl(extractor = get())
+    }
+
+    // Room Database & DAOs
+    single<StereoDatabase> {
+        Room.databaseBuilder(
+            androidContext(),
+            StereoDatabase::class.java,
+            "stereo_database.db"
+        ).build()
+    }
+    single<TrackDao> { get<StereoDatabase>().trackDao() }
+    single<LikedSongDao> { get<StereoDatabase>().likedSongDao() }
+    single<PlaylistDao> { get<StereoDatabase>().playlistDao() }
+    single<HistoryDao> { get<StereoDatabase>().historyDao() }
+    single<QueueDao> { get<StereoDatabase>().queueDao() }
+
+    // Liked Songs Repository
+    single<LikedSongsRepository> {
+        LikedSongsRepositoryImpl(
+            trackDao = get(),
+            likedSongDao = get()
+        )
     }
 
     // Media3 Data Source Factory with Web Remix headers
