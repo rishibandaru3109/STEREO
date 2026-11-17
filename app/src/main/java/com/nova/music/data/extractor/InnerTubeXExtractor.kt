@@ -29,7 +29,8 @@ import java.net.URI
  * Reuses Metrolist's multi-client catalog fallback and QuackJS AST cipher solver.
  */
 class InnerTubeXExtractor(
-    private val okHttpClient: OkHttpClient
+    private val okHttpClient: OkHttpClient,
+    private val fallbackExtractor: MusicExtractor = YouTubeMusicExtractor(okHttpClient)
 ) : MusicExtractor {
 
     private val ktorClient: HttpClient = HttpClient(OkHttp) {
@@ -79,7 +80,7 @@ class InnerTubeXExtractor(
     }
 
     override suspend fun search(query: String): Result<List<Track>> = withContext(Dispatchers.IO) {
-        runCatching {
+        val primaryResult = runCatching {
             logI("Searching music via InnerTubeX: query='$query'")
             val startTime = System.currentTimeMillis()
             val response = innerTube.search(
@@ -91,42 +92,67 @@ class InnerTubeXExtractor(
             val elapsed = System.currentTimeMillis() - startTime
             logI("Search completed in ${elapsed}ms: found ${tracks.size} tracks")
             tracks
-        }.onFailure { error ->
-            logE("Search failed for query '$query': ${error.message}", error)
+        }
+
+        if (primaryResult.isSuccess && !primaryResult.getOrNull().isNullOrEmpty()) {
+            primaryResult
+        } else {
+            logI("InnerTubeX search yielded no results or failed (${primaryResult.exceptionOrNull()?.message}). Falling back to YouTubeMusicExtractor.")
+            fallbackExtractor.search(query)
         }
     }
 
     override suspend fun resolveAudioStream(trackId: String): Result<AudioStream> = withContext(Dispatchers.IO) {
-        runCatching {
-            logI("Resolving audio stream via InnerTubeX for track: $trackId")
-            val startTime = System.currentTimeMillis()
-            val extracted = streamExtractor.extract(
+        val startTime = System.currentTimeMillis()
+        logI("Resolving audio stream via InnerTubeX for track: $trackId")
+
+        val extracted = try {
+            streamExtractor.extract(
                 videoId = trackId,
                 hints = ContentHints(),
                 audioQuality = AudioQuality.AUTO
-            ) ?: error("InnerTubeX returned null stream for track: $trackId")
-
-            val elapsed = System.currentTimeMillis() - startTime
-            val host = runCatching { URI(extracted.audioUrl).host }.getOrDefault("unknown")
-            logI("Stream resolved in ${elapsed}ms: host=$host, itag=${extracted.itag}, client=${extracted.clientName}, mime=${extracted.mimeType}")
-
-            AudioStream(
-                url = extracted.audioUrl,
-                mimeType = extracted.mimeType ?: "audio/webm",
-                codec = extracted.codecs ?: "opus",
-                bitrate = extracted.bitrate ?: 160000,
-                formatId = extracted.itag.toString(),
-                contentLength = extracted.contentLengthBytes ?: 0L,
-                isAudioOnly = true,
-                headers = extracted.headers
             )
-        }.onFailure { error ->
-            logE("Failed to resolve stream for track '$trackId': ${error.message}", error)
+        } catch (e: Exception) {
+            logE("InnerTubeX extraction error: ${e.message}", e)
+            null
+        }
+
+        val rawUrl = extracted?.audioUrl ?: ""
+        val isValidDirectUrl = (rawUrl.startsWith("http://") || rawUrl.startsWith("https://")) && rawUrl.contains("googlevideo.com")
+
+        if (extracted != null && isValidDirectUrl) {
+            val elapsed = System.currentTimeMillis() - startTime
+            val host = runCatching { URI(rawUrl).host }.getOrDefault("unknown")
+            logI("InnerTubeX stream resolved in ${elapsed}ms: host=$host, itag=${extracted.itag}, client=${extracted.clientName}, mime=${extracted.mimeType}")
+
+            Result.success(
+                AudioStream(
+                    url = rawUrl,
+                    mimeType = extracted.mimeType ?: "audio/webm",
+                    codec = extracted.codecs ?: "opus",
+                    bitrate = extracted.bitrate ?: 160000,
+                    formatId = extracted.itag.toString(),
+                    contentLength = extracted.contentLengthBytes ?: 0L,
+                    isAudioOnly = true,
+                    headers = extracted.headers
+                )
+            )
+        } else {
+            val elapsed = System.currentTimeMillis() - startTime
+            logI("InnerTubeX returned non-direct or invalid URL ('${rawUrl.take(60)}') in ${elapsed}ms. Seamlessly falling back to YouTubeMusicExtractor for track: $trackId")
+            val fallbackResult = fallbackExtractor.resolveAudioStream(trackId)
+            if (fallbackResult.isSuccess) {
+                val totalElapsed = System.currentTimeMillis() - startTime
+                logI("Fallback YouTubeMusicExtractor resolved stream in ${totalElapsed}ms for track: $trackId")
+            } else {
+                logE("Fallback resolution failed for track '$trackId': ${fallbackResult.exceptionOrNull()?.message}", fallbackResult.exceptionOrNull())
+            }
+            fallbackResult
         }
     }
 
     override suspend fun getTrackDetails(trackId: String): Result<Track> = withContext(Dispatchers.IO) {
-        runCatching {
+        val primary = runCatching {
             logI("Fetching track details via InnerTubeX: $trackId")
             val response = innerTube.player(
                 client = YouTubeClient.WEB_REMIX,
@@ -134,8 +160,12 @@ class InnerTubeXExtractor(
             )
             val jsonStr = response.bodyAsText()
             parsePlayerDetails(trackId, jsonStr)
-        }.onFailure { error ->
-            logE("Failed to fetch details for track '$trackId': ${error.message}", error)
+        }
+        if (primary.isSuccess) {
+            primary
+        } else {
+            logI("InnerTubeX track details failed (${primary.exceptionOrNull()?.message}). Falling back to YouTubeMusicExtractor.")
+            fallbackExtractor.getTrackDetails(trackId)
         }
     }
 

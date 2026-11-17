@@ -48,12 +48,29 @@ class InnerTubeXExtractorTest {
         val stream = result.getOrNull()
         assertNotNull("Audio stream should not be null", stream)
         println("=== INNERTUBEX STREAM RESOLVED ===")
-        println("URL Host: ${java.net.URI(stream!!.url).host}")
+        println("URL: ${stream!!.url}")
+        println("URL Host: ${java.net.URI(stream.url).host}")
         println("Codec: ${stream.codec}")
         println("Mime: ${stream.mimeType}")
         println("Headers: ${stream.headers.keys}")
 
         assertTrue("Stream URL must be valid", stream.url.startsWith("https://"))
         assertTrue("Stream URL must target Google Video CDN", stream.url.contains("googlevideo.com"))
+    }
+
+    @Test
+    fun testResolveAudioStreamVivaLaVida() {
+        runBlocking {
+            val videoId = "ALsvdSA9tOU" // Viva La Vida
+            val result = extractor.resolveAudioStream(videoId)
+            assertTrue("Stream resolution should succeed: ${result.exceptionOrNull()?.message}", result.isSuccess)
+            val stream = result.getOrNull()
+            assertNotNull("Audio stream should not be null", stream)
+            println("=== VIVA LA VIDA RESULT: isSuccess=${result.isSuccess} ===")
+            println("URL: ${stream!!.url}")
+            println("Host: ${java.net.URI(stream.url).host}")
+            assertTrue("Stream URL must be valid HTTPS", stream.url.startsWith("https://"))
+            assertTrue("Stream URL must target Google Video CDN", stream.url.contains("googlevideo.com"))
+        }
     }
 }
