@@ -57,6 +57,18 @@ class LibraryViewModel(
     val recentTracks: StateFlow<List<Track>> = historyRepository.getRecentTracks(limit = 20)
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
+    private val _isRefreshing = MutableStateFlow(false)
+    val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
+
+    fun refresh() {
+        if (_isRefreshing.value) return
+        viewModelScope.launch {
+            _isRefreshing.value = true
+            kotlinx.coroutines.delay(400)
+            _isRefreshing.value = false
+        }
+    }
+
     private val _selectedPlaylistId = MutableStateFlow<String?>(null)
     val selectedPlaylistId: StateFlow<String?> = _selectedPlaylistId.asStateFlow()
 

@@ -1,5 +1,6 @@
 package com.nova.music.feature.home
 
+import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -38,11 +39,17 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshContainer
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -52,7 +59,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import com.nova.music.R
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -68,6 +79,7 @@ import com.nova.music.domain.model.Track
 import com.nova.music.feature.navigation.StereoTopHeader
 import java.util.Calendar
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     viewModel: HomeViewModel,
@@ -80,6 +92,29 @@ fun HomeScreen(
     val isOnboardingCompleted by viewModel.isOnboardingCompleted.collectAsStateWithLifecycle()
     val colors = StereoTheme.colors
     val greeting = rememberGreeting()
+    val context = LocalContext.current
+
+    val pullToRefreshState = rememberPullToRefreshState()
+    if (pullToRefreshState.isRefreshing) {
+        LaunchedEffect(true) {
+            viewModel.loadHomeFeed(forceRefresh = true)
+        }
+    }
+    LaunchedEffect(state.isRefreshing) {
+        if (state.isRefreshing) {
+            pullToRefreshState.startRefresh()
+        } else {
+            pullToRefreshState.endRefresh()
+        }
+    }
+
+    LaunchedEffect(state.userMessage) {
+        val msg = state.userMessage
+        if (msg != null) {
+            Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+            viewModel.clearUserMessage()
+        }
+    }
 
     if (!isOnboardingCompleted) {
         RecommendationOnboardingDialog(
@@ -109,7 +144,11 @@ fun HomeScreen(
         Spacer(modifier = Modifier.height(12.dp))
 
         // Feed Body
-        Box(modifier = Modifier.fillMaxSize()) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .nestedScroll(pullToRefreshState.nestedScrollConnection)
+        ) {
             when {
                 state.isLoading && state.sections.isEmpty() -> {
                     Box(
@@ -194,7 +233,65 @@ fun HomeScreen(
                     }
                 }
             }
+
+            // Surprise Me Floating Action Button (Theme-aware, positioned above mini-player)
+            SurpriseMeFab(
+                isLoading = state.isSurpriseMeLoading,
+                onClick = { viewModel.triggerSurpriseMe() },
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(
+                        end = 16.dp,
+                        bottom = if (state.currentlyPlayingTrackId != null) 156.dp else 84.dp
+                    )
+            )
+
+            // Native Theme-aware Material 3 Pull to Refresh Indicator
+            PullToRefreshContainer(
+                state = pullToRefreshState,
+                modifier = Modifier.align(Alignment.TopCenter),
+                containerColor = colors.surfaceElevated,
+                contentColor = colors.primaryAccent
+            )
         }
+    }
+}
+
+@Composable
+private fun SurpriseMeFab(
+    isLoading: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val colors = StereoTheme.colors
+    ExtendedFloatingActionButton(
+        onClick = { if (!isLoading) onClick() },
+        shape = RoundedCornerShape(24.dp),
+        containerColor = colors.primaryAccent,
+        contentColor = colors.background,
+        elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 6.dp),
+        modifier = modifier
+    ) {
+        if (isLoading) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(20.dp),
+                color = colors.background,
+                strokeWidth = 2.dp
+            )
+        } else {
+            Icon(
+                painter = painterResource(id = R.drawable.ic_dice_surprise),
+                contentDescription = "Surprise me",
+                modifier = Modifier.size(20.dp),
+                tint = colors.background
+            )
+        }
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(
+            text = "Surprise me",
+            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+            color = colors.background
+        )
     }
 }
 

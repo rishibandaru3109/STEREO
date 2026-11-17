@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Main deck outer chassis -->
+    <path
+        android:fillColor="#000000"
+        android:pathData="M 38,26 L 70,26 C 76,26 81,31 81,37 L 81,71 C 81,77 76,82 70,82 L 38,82 C 32,82 27,77 27,71 L 27,37 C 27,31 32,26 38,26 Z
+                          M 36,33 C 34,33 32,35 32,37 L 32,58 C 32,60 34,62 36,62 L 72,62 C 74,62 76,60 76,58 L 76,37 C 76,35 74,33 72,33 Z" />
+
+    <!-- Left Reel (solid circle with cutout holes) -->
+    <path
+        android:fillColor="#000000"
+        android:pathData="M 43,39 A 8,8 0 1,0 43,55 A 8,8 0 1,0 43,39 Z
+                          M 43,45 A 2,2 0 1,1 43,49 A 2,2 0 1,1 43,45 Z" />
+
+    <!-- Right Reel (solid circle with cutout holes) -->
+    <path
+        android:fillColor="#000000"
+        android:pathData="M 65,39 A 8,8 0 1,0 65,55 A 8,8 0 1,0 65,39 Z
+                          M 65,45 A 2,2 0 1,1 65,49 A 2,2 0 1,1 65,45 Z" />
+
+    <!-- Tape Bridge and Head Guides -->
+    <path
+        android:fillColor="#000000"
+        android:pathData="M 44,52 L 50,57 L 58,57 L 64,52 L 63,50 L 58,55 L 50,55 L 45,50 Z" />
+
+    <!-- Tape Head Assembly Blocks -->
+    <path
+        android:fillColor="#000000"
+        android:pathData="M 49,53 L 53,53 L 53,56 L 49,56 Z
+                          M 55,53 L 59,53 L 59,56 L 55,56 Z" />
+
+    <!-- Left Knob -->
+    <path
+        android:fillColor="#000000"
+        android:pathData="M 38,67 A 4,4 0 1,0 38,75 A 4,4 0 1,0 38,67 Z" />
+
+    <!-- Middle Knob -->
+    <path
+        android:fillColor="#000000"
+        android:pathData="M 50,67 A 4,4 0 1,0 50,75 A 4,4 0 1,0 50,67 Z" />
+
+    <!-- VU Meter Box -->
+    <path
+        android:fillColor="#000000"
+        android:pathData="M 64,68 L 74,68 C 75,68 76,69 76,70 L 76,75 C 76,76 75,77 74,77 L 64,77 C 63,77 62,76 62,75 L 62,70 C 62,69 63,68 64,68 Z
+                          M 64,70 L 74,70 L 74,75 L 64,75 Z" />
+
+    <!-- VU Meter Needle -->
+    <path
+        android:fillColor="#000000"
+        android:pathData="M 68,75 L 72,71 L 73,72 L 69,76 Z" />
+</vector>

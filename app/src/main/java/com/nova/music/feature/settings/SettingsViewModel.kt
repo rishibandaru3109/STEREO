@@ -13,6 +13,7 @@ import com.nova.music.core.designsystem.wallpaper.WallpaperMode
 import com.nova.music.core.designsystem.wallpaper.WallpaperRepository
 import com.nova.music.domain.repository.ContentFilterMode
 import com.nova.music.domain.repository.HistoryRepository
+import com.nova.music.domain.repository.HomeRepository
 import com.nova.music.domain.repository.MusicPreferencesRepository
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -25,7 +26,8 @@ class SettingsViewModel(
     private val wallpaperRepository: WallpaperRepository,
     private val preferencesRepository: MusicPreferencesRepository,
     private val historyRepository: HistoryRepository,
-    private val context: Context
+    private val context: Context,
+    private val homeRepository: HomeRepository? = null
 ) : ViewModel() {
 
     val selectedThemeId: StateFlow<String> = themeRepository.selectedThemeId
@@ -134,6 +136,7 @@ class SettingsViewModel(
             try {
                 context.cacheDir.deleteRecursively()
                 context.cacheDir.mkdirs()
+                homeRepository?.clearCache()
             } catch (_: Exception) {}
         }
     }
@@ -148,6 +151,9 @@ class SettingsViewModel(
     }
 
     fun resetRecommendationPreferences() {
-        viewModelScope.launch { preferencesRepository.resetRecommendationPreferences() }
+        viewModelScope.launch {
+            preferencesRepository.resetRecommendationPreferences()
+            homeRepository?.clearCache()
+        }
     }
 }

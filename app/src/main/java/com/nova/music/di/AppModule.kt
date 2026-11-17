@@ -33,6 +33,8 @@ import com.nova.music.domain.recommendation.CandidateProvider
 import com.nova.music.domain.recommendation.CatalogCandidateProvider
 import com.nova.music.domain.recommendation.RecommendationEngine
 import com.nova.music.domain.recommendation.RecommendationEngineImpl
+import com.nova.music.domain.recommendation.SurpriseMeEngine
+import com.nova.music.domain.recommendation.SurpriseMeEngineImpl
 import com.nova.music.domain.repository.HistoryRepository
 import com.nova.music.domain.repository.HomeRepository
 import com.nova.music.domain.repository.LikedSongsRepository
@@ -182,6 +184,10 @@ val appModule = module {
         RecommendationEngineImpl()
     }
 
+    single<SurpriseMeEngine> {
+        SurpriseMeEngineImpl(recommendationEngine = get())
+    }
+
     single<HomeRepository> {
         HomeRepositoryImpl(
             listeningProfileRepository = get(),
@@ -248,7 +254,10 @@ val appModule = module {
             homeRepository = get(),
             playerController = get(),
             likedSongsRepository = get(),
-            preferencesRepository = get()
+            preferencesRepository = get(),
+            surpriseMeEngine = get(),
+            listeningProfileRepository = get(),
+            candidateProvider = get()
         )
     }
 
@@ -304,7 +313,8 @@ val appModule = module {
             wallpaperRepository = get(),
             preferencesRepository = get(),
             historyRepository = get(),
-            context = androidContext()
+            context = androidContext(),
+            homeRepository = get()
         )
     }
 }

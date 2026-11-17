@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Dice Outer Body -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M 6,3 L 18,3 C 19.66,3 21,4.34 21,6 L 21,18 C 21,19.66 19.66,21 18,21 L 6,21 C 4.34,21 3,19.66 3,18 L 3,6 C 3,4.34 4.34,3 6,3 Z
+                          M 6,5 C 5.45,5 5,5.45 5,6 L 5,18 C 5,18.55 5.45,19 6,19 L 18,19 C 18.55,19 19,18.55 19,18 L 19,6 C 19,5.45 18.55,5 18,5 Z" />
+
+    <!-- Center Pip -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M 12,10.5 A 1.5,1.5 0 1,0 12,13.5 A 1.5,1.5 0 1,0 12,10.5 Z" />
+
+    <!-- Top-Left Pip -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M 8,6.5 A 1.5,1.5 0 1,0 8,9.5 A 1.5,1.5 0 1,0 8,6.5 Z" />
+
+    <!-- Top-Right Pip -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M 16,6.5 A 1.5,1.5 0 1,0 16,9.5 A 1.5,1.5 0 1,0 16,6.5 Z" />
+
+    <!-- Bottom-Left Pip -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M 8,14.5 A 1.5,1.5 0 1,0 8,17.5 A 1.5,1.5 0 1,0 8,14.5 Z" />
+
+    <!-- Bottom-Right Pip -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M 16,14.5 A 1.5,1.5 0 1,0 16,17.5 A 1.5,1.5 0 1,0 16,14.5 Z" />
+</vector>

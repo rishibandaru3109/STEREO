@@ -36,6 +36,9 @@ class FakeHomeRepository : HomeRepository {
         lastFeedbackTrackId = trackId
         lastFeedbackType = feedbackType
     }
+
+    override suspend fun clearCache() {
+    }
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)

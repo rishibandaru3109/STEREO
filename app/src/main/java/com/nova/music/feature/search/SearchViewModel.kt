@@ -24,7 +24,8 @@ sealed interface SearchUiState {
 data class SearchScreenState(
     val query: String = "",
     val searchUiState: SearchUiState = SearchUiState.Idle,
-    val currentlyPlayingTrackId: String? = null
+    val currentlyPlayingTrackId: String? = null,
+    val isRefreshing: Boolean = false
 )
 
 class SearchViewModel(
@@ -88,6 +89,39 @@ class SearchViewModel(
                         searchUiState = SearchUiState.Error(error.localizedMessage ?: "Failed to search music")
                     )
                 }
+            }
+        }
+    }
+
+    fun refresh() {
+        if (_uiState.value.isRefreshing) return
+        val q = _uiState.value.query.trim()
+        if (q.isNotEmpty()) {
+            viewModelScope.launch {
+                _uiState.update { it.copy(isRefreshing = true) }
+                musicRepository.search(q).collect { result ->
+                    result.onSuccess { tracks ->
+                        _uiState.update {
+                            it.copy(
+                                isRefreshing = false,
+                                searchUiState = if (tracks.isEmpty()) SearchUiState.Empty else SearchUiState.Success(tracks)
+                            )
+                        }
+                    }.onFailure { error ->
+                        _uiState.update {
+                            it.copy(
+                                isRefreshing = false,
+                                searchUiState = SearchUiState.Error(error.localizedMessage ?: "Failed to refresh search results")
+                            )
+                        }
+                    }
+                }
+            }
+        } else {
+            viewModelScope.launch {
+                _uiState.update { it.copy(isRefreshing = true) }
+                delay(600)
+                _uiState.update { it.copy(isRefreshing = false) }
             }
         }
     }

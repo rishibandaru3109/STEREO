@@ -76,6 +76,10 @@ class HomeRepositoryImpl(
         recommendationDao.clearAllCache()
     }
 
+    override suspend fun clearCache() = withContext(Dispatchers.IO) {
+        recommendationDao.clearAllCache()
+    }
+
     private suspend fun loadCachedSections(now: Long): List<RecommendationSection> {
         val sections = mutableListOf<RecommendationSection>()
 

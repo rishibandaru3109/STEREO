@@ -25,7 +25,7 @@ class CatalogCandidateProvider(
 
         private fun logProvenance(msg: String) {
             try {
-                Log.i(TAG, msg)
+                Log.w(TAG, msg)
             } catch (_: Throwable) {
                 println("[$TAG] $msg")
             }
