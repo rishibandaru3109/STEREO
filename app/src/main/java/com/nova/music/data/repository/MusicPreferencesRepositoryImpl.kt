@@ -9,6 +9,7 @@ import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.nova.music.domain.repository.ContentFilterMode
 import com.nova.music.domain.repository.MusicPreferencesRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
@@ -27,6 +28,7 @@ class MusicPreferencesRepositoryImpl(
         val KEY_DISCOVERY_MODE = stringPreferencesKey("pref_discovery_mode")
         val KEY_ONBOARDING_COMPLETED = booleanPreferencesKey("pref_onboarding_completed")
         val KEY_HISTORY_ENABLED = booleanPreferencesKey("pref_history_enabled")
+        val KEY_CONTENT_FILTER_MODE = stringPreferencesKey("pref_content_filter_mode")
 
         val DEFAULT_LANGUAGES = setOf("English", "Hindi")
         val DEFAULT_GENRES = setOf("Pop", "Rock", "Hip-Hop", "Chill")
@@ -53,6 +55,15 @@ class MusicPreferencesRepositoryImpl(
         .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
         .map { it[KEY_HISTORY_ENABLED] ?: true }
 
+    override val contentFilterMode: Flow<ContentFilterMode> = context.musicPreferencesDataStore.data
+        .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
+        .map {
+            when (it[KEY_CONTENT_FILTER_MODE]) {
+                ContentFilterMode.ALL_CONTENT.name -> ContentFilterMode.ALL_CONTENT
+                else -> ContentFilterMode.MUSIC_ONLY
+            }
+        }
+
     override suspend fun setPreferredLanguages(languages: Set<String>) {
         context.musicPreferencesDataStore.edit { it[KEY_LANGUAGES] = languages }
     }
@@ -71,6 +82,10 @@ class MusicPreferencesRepositoryImpl(
 
     override suspend fun setHistoryEnabled(enabled: Boolean) {
         context.musicPreferencesDataStore.edit { it[KEY_HISTORY_ENABLED] = enabled }
+    }
+
+    override suspend fun setContentFilterMode(mode: ContentFilterMode) {
+        context.musicPreferencesDataStore.edit { it[KEY_CONTENT_FILTER_MODE] = mode.name }
     }
 
     override suspend fun resetRecommendationPreferences() {

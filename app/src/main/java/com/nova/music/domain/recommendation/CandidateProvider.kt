@@ -1,7 +1,9 @@
 package com.nova.music.domain.recommendation
 
+import android.util.Log
 import com.nova.music.domain.model.ListeningProfile
 import com.nova.music.domain.model.Track
+import com.nova.music.domain.repository.ContentFilterMode
 import com.nova.music.domain.repository.MusicExtractor
 import com.nova.music.domain.repository.MusicPreferencesRepository
 import kotlinx.coroutines.async
@@ -18,63 +20,156 @@ class CatalogCandidateProvider(
     private val preferencesRepository: MusicPreferencesRepository? = null
 ) : CandidateProvider {
 
-    private val defaultDiscoveryQueries = listOf(
+    companion object {
+        private const val TAG = "STEREO_REC_PROVENANCE"
+
+        private fun logProvenance(msg: String) {
+            try {
+                Log.i(TAG, msg)
+            } catch (_: Throwable) {
+                println("[$TAG] $msg")
+            }
+        }
+    }
+
+    private val defaultColdStartQueries = listOf(
         "Top hits music",
-        "New trending music 2024",
-        "Chill acoustic vibes",
-        "Electronic dance essentials",
-        "Indie alternative favorites"
+        "Trending music essentials",
+        "Chill acoustic vibes"
     )
 
     override suspend fun getCandidates(
         profile: ListeningProfile,
         excludedTrackIds: Set<String>
     ): List<Track> = coroutineScope {
-        val searchQueries = mutableListOf<String>()
+        val allHarvestedCandidates = mutableListOf<Track>()
 
-        // 1. Incorporate User's Preferred Genres and Languages from Onboarding/Settings
-        val userGenres = preferencesRepository?.preferredGenres?.first() ?: emptySet()
-        val userLanguages = preferencesRepository?.preferredLanguages?.first() ?: emptySet()
+        // =====================================================================
+        // 1. PRIORITIZE SONG-RADIO SEEDED FROM HIGH-AFFINITY USER TRACKS
+        // Priority order: 1) Liked tracks, 2) Repeatedly played/completed tracks, 3) Recent tracks
+        // =====================================================================
+        val seedCandidates = mutableListOf<Pair<String, String>>() // Pair(trackId, seedReason)
 
-        for (genre in userGenres.take(3)) {
-            searchQueries.add("$genre music hits")
-        }
-        for (lang in userLanguages.take(2)) {
-            searchQueries.add("$lang top songs")
-        }
-
-        // 2. Incorporate Top Artists from Listening Profile
-        if (profile.topArtists.isNotEmpty()) {
-            val topArtistNames = profile.topArtists.take(3).map { it.artistName }
-            for (artist in topArtistNames) {
-                searchQueries.add("$artist songs")
-                searchQueries.add("tracks similar to $artist")
-            }
+        // A. Liked Tracks
+        for (likedId in profile.likedTrackIds.take(2)) {
+            seedCandidates.add(likedId to "Liked Track")
         }
 
-        // 3. Fallback or Supplementary Discovery Seeds
-        if (searchQueries.size < 4) {
-            val needed = 4 - searchQueries.size
-            searchQueries.addAll(defaultDiscoveryQueries.take(needed))
+        // B. Repeatedly Played / High-Affinity Tracks
+        val highAffinityTracks = profile.topTracks
+            .filter { it.playCount >= 2 || it.score >= 5.0 }
+            .sortedByDescending { it.score }
+            .map { it.trackId }
+            .filter { id -> !seedCandidates.any { it.first == id } }
+
+        for (topId in highAffinityTracks.take(2)) {
+            seedCandidates.add(topId to "Repeatedly Played Track")
         }
 
-        // Parallelize candidate searches (capped at 6 to prevent network saturation)
-        val queriesToRun = searchQueries.distinct().take(6)
-        val searchDeferreds = queriesToRun.map { query ->
+        // C. Explicitly Selected / Recent Tracks
+        val recentIds = profile.recentTracks
+            .map { it.id }
+            .filter { id -> !seedCandidates.any { it.first == id } }
+
+        for (recentId in recentIds.take(1)) {
+            seedCandidates.add(recentId to "Recent Track")
+        }
+
+        val seedDeferreds = seedCandidates.take(3).map { (seedId, seedReason) ->
             async {
-                try {
-                    extractor.search(query).getOrDefault(emptyList())
-                } catch (_: Exception) {
+                val seedName = profile.recentTracks.find { it.id == seedId }?.title
+                    ?: profile.topTracks.find { it.trackId == seedId }?.title
+                    ?: seedId
+                val startTime = System.currentTimeMillis()
+                val result = try {
+                    extractor.getSongRadio(seedId).getOrDefault(emptyList())
+                } catch (e: Exception) {
+                    logProvenance("Song radio failed for seed '$seedName' ($seedId): ${e.message}")
                     emptyList()
                 }
+                val elapsed = System.currentTimeMillis() - startTime
+                logProvenance("Seed [$seedReason]: '$seedName' ($seedId) -> Endpoint: innerTube.next -> Fetched ${result.size} candidates in ${elapsed}ms")
+                result
             }
         }
 
-        val allResults = searchDeferreds.awaitAll().flatten()
+        val radioCandidates = seedDeferreds.awaitAll().flatten()
+        allHarvestedCandidates.addAll(radioCandidates)
 
-        // Filter excluded tracks and deduplicate candidate pool
-        allResults
+        // =====================================================================
+        // 2. FALLBACK / COLD START / SUPPLEMENTARY DISCOVERY
+        // Note: Unauthenticated FEmusic_home is treated as potentially generic
+        // and used only when seeds are scarce or for cold-start onboarding.
+        // =====================================================================
+        val isColdStart = profile.isColdStart || allHarvestedCandidates.size < 15
+
+        if (isColdStart) {
+            logProvenance("Seed pool scarce (${allHarvestedCandidates.size} tracks) or cold start; engaging supplementary discovery")
+
+            // A. Fetch YouTube Music Explore/Home Shelves (Marked as generic discovery)
+            val homeDeferred = async {
+                val startTime = System.currentTimeMillis()
+                val homeTracks = try {
+                    extractor.getHomeShelves().getOrDefault(emptyList())
+                } catch (e: Exception) {
+                    logProvenance("FEmusic_home fetch failed: ${e.message}")
+                    emptyList()
+                }
+                val elapsed = System.currentTimeMillis() - startTime
+                logProvenance("Discovery: unauthenticated FEmusic_home -> Endpoint: innerTube.browse -> Fetched ${homeTracks.size} generic discovery candidates in ${elapsed}ms")
+                homeTracks
+            }
+
+            // B. User Preferences (Selected genres and languages from onboarding)
+            val userGenres = preferencesRepository?.preferredGenres?.first() ?: emptySet()
+            val userLanguages = preferencesRepository?.preferredLanguages?.first() ?: emptySet()
+            val queryList = mutableListOf<String>()
+
+            for (genre in userGenres.take(2)) {
+                queryList.add("$genre music")
+            }
+            for (lang in userLanguages.take(1)) {
+                queryList.add("$lang top songs")
+            }
+            if (queryList.isEmpty()) {
+                queryList.addAll(defaultColdStartQueries.take(2))
+            }
+
+            val queryDeferreds = queryList.distinct().take(3).map { query ->
+                async {
+                    val startTime = System.currentTimeMillis()
+                    val searchTracks = try {
+                        extractor.search(query).getOrDefault(emptyList())
+                    } catch (e: Exception) {
+                        logProvenance("Search query '$query' failed: ${e.message}")
+                        emptyList()
+                    }
+                    val elapsed = System.currentTimeMillis() - startTime
+                    logProvenance("Preference Query: '$query' -> Endpoint: innerTube.search -> Fetched ${searchTracks.size} candidates in ${elapsed}ms")
+                    searchTracks
+                }
+            }
+
+            val discoveryCandidates = (listOf(homeDeferred) + queryDeferreds).awaitAll().flatten()
+            allHarvestedCandidates.addAll(discoveryCandidates)
+        }
+
+        // =====================================================================
+        // 3. METADATA-FIRST CONTENT FILTERING (Music Only vs All Content)
+        // =====================================================================
+        val filterMode = preferencesRepository?.contentFilterMode?.first() ?: ContentFilterMode.MUSIC_ONLY
+        val filteredCandidates = ContentFilter.filterTracks(allHarvestedCandidates, filterMode)
+        val suppressedCount = allHarvestedCandidates.size - filteredCandidates.size
+        logProvenance("ContentFilter: mode=$filterMode, Total harvested=${allHarvestedCandidates.size}, Passed=${filteredCandidates.size}, Suppressed=$suppressedCount non-music tracks")
+
+        // =====================================================================
+        // 4. NEGATIVE FEEDBACK EXCLUSION & DEDUPLICATION
+        // =====================================================================
+        val finalPool = filteredCandidates
             .filter { track -> !excludedTrackIds.contains(track.id) }
             .distinctBy { it.id }
+
+        logProvenance("Final Candidate Pool: ${finalPool.size} unique tracks available for recommendation sections")
+        finalPool
     }
 }

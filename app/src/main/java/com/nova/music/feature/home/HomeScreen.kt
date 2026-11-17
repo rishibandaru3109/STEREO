@@ -99,37 +99,11 @@ fun HomeScreen(
     ) {
         Spacer(modifier = Modifier.height(8.dp))
 
-        // Compact Brand Header (Phase A1 & B1)
+        // Compact Brand Header (Phase 2)
         StereoTopHeader(
             title = greeting,
             subtitle = "STEREO DISCOVER",
-            onOpenSettings = onOpenSettings,
-            onOpenThemeGallery = onOpenThemeGallery,
-            actions = {
-                IconButton(
-                    onClick = { viewModel.loadHomeFeed(forceRefresh = true) },
-                    modifier = Modifier
-                        .size(38.dp)
-                        .clip(CircleShape)
-                        .background(colors.surfaceElevated)
-                ) {
-                    if (state.isRefreshing) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(16.dp),
-                            strokeWidth = 2.dp,
-                            color = colors.primaryAccent
-                        )
-                    } else {
-                        Icon(
-                            imageVector = Icons.Default.Refresh,
-                            contentDescription = "Refresh",
-                            tint = colors.textSecondary,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-                }
-                Spacer(modifier = Modifier.width(8.dp))
-            }
+            onOpenSettings = onOpenSettings
         )
 
         Spacer(modifier = Modifier.height(12.dp))

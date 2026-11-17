@@ -98,12 +98,11 @@ fun LibraryScreen(
     ) {
         Spacer(modifier = Modifier.height(8.dp))
 
-        // Compact Brand Header (Phase A1 & B3)
+        // Compact Brand Header (Phase 2)
         com.nova.music.feature.navigation.StereoTopHeader(
             title = "Your Library",
             subtitle = "COLLECTION",
-            onOpenSettings = onOpenSettings,
-            onOpenThemeGallery = onOpenThemeGallery
+            onOpenSettings = onOpenSettings
         )
 
         Spacer(modifier = Modifier.height(8.dp))

@@ -112,7 +112,7 @@ val appModule = module {
 
     // Repository
     single<MusicRepository> {
-        MusicRepositoryImpl(extractor = get())
+        MusicRepositoryImpl(extractor = get(), preferencesRepository = get())
     }
 
     // Room Database & DAOs with Migration(1, 2)

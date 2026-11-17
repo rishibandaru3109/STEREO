@@ -2,11 +2,8 @@ package com.nova.music.feature.navigation
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -16,7 +13,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -37,16 +33,14 @@ import com.nova.music.core.designsystem.theme.StereoTheme
 
 /**
  * Compact, unified top header for STEREO.
- * Replaces the oversized wordmark with the brand reel-to-reel logo asset,
- * contextual title, and accessible navigation to Settings and Themes.
+ * Renders exclusively the brand reel-to-reel logo asset, contextual title/greeting,
+ * and the Settings gear button (<56dp height).
  */
 @Composable
 fun StereoTopHeader(
     title: String,
     subtitle: String? = null,
     onOpenSettings: () -> Unit,
-    onOpenThemeGallery: (() -> Unit)? = null,
-    actions: @Composable (RowScope.() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val colors = StereoTheme.colors
@@ -58,10 +52,10 @@ fun StereoTopHeader(
             .padding(horizontal = 16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Compact Brand Logo
+        // Compact Brand Logo (Official Analog Reel-to-Reel Deck)
         Image(
             painter = painterResource(id = R.drawable.ic_stereo_logo_compact),
-            contentDescription = "STEREO Logo",
+            contentDescription = "STEREO Brand Logo",
             contentScale = ContentScale.Crop,
             modifier = Modifier
                 .size(36.dp)
@@ -70,7 +64,7 @@ fun StereoTopHeader(
 
         Spacer(modifier = Modifier.width(12.dp))
 
-        // Title and Subtitle
+        // Contextual Title and Subtitle
         Column(
             modifier = Modifier.weight(1f)
         ) {
@@ -99,29 +93,7 @@ fun StereoTopHeader(
             }
         }
 
-        // Optional screen-specific actions
-        actions?.invoke(this)
-
-        // Theme Gallery Button
-        if (onOpenThemeGallery != null) {
-            IconButton(
-                onClick = onOpenThemeGallery,
-                modifier = Modifier
-                    .size(38.dp)
-                    .clip(CircleShape)
-                    .background(colors.surfaceElevated)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Palette,
-                    contentDescription = "Themes",
-                    tint = colors.textSecondary,
-                    modifier = Modifier.size(18.dp)
-                )
-            }
-            Spacer(modifier = Modifier.width(8.dp))
-        }
-
-        // Settings Button
+        // Settings Gear Button
         IconButton(
             onClick = onOpenSettings,
             modifier = Modifier

@@ -1,5 +1,7 @@
 package com.nova.music.feature.settings
 
+import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -26,13 +28,18 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.AddPhotoAlternate
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Storage
@@ -57,7 +64,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -65,7 +73,21 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nova.music.core.designsystem.theme.CardStyleMode
 import com.nova.music.core.designsystem.theme.StereoTheme
 import com.nova.music.core.designsystem.wallpaper.WallpaperMode
+import com.nova.music.domain.repository.ContentFilterMode
 import com.nova.music.feature.home.RecommendationOnboardingDialog
+
+private enum class SettingsDestination(val title: String) {
+    MAIN("SETTINGS"),
+    APPEARANCE("APPEARANCE"),
+    ADVANCED_CUSTOMIZATION("ADVANCED CUSTOMIZATION"),
+    AUDIO_PLAYBACK("AUDIO & PLAYBACK"),
+    RECOMMENDATIONS("RECOMMENDATIONS"),
+    CONTENT_PREFERENCES("CONTENT PREFERENCES"),
+    LIBRARY_DATA("LIBRARY & DATA"),
+    STORAGE_CACHE("STORAGE & CACHE"),
+    PRIVACY("PRIVACY"),
+    ABOUT("ABOUT")
+}
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -74,7 +96,10 @@ fun SettingsScreen(
     onBackClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     val colors = StereoTheme.colors
+    var currentDestination by remember { mutableStateOf(SettingsDestination.MAIN) }
+
     val selectedThemeId by viewModel.selectedThemeId.collectAsStateWithLifecycle()
     val cardStyleMode by viewModel.cardStyleMode.collectAsStateWithLifecycle()
     val advancedAppearance by viewModel.advancedAppearance.collectAsStateWithLifecycle()
@@ -82,6 +107,7 @@ fun SettingsScreen(
     val preferredLanguages by viewModel.preferredLanguages.collectAsStateWithLifecycle()
     val preferredGenres by viewModel.preferredGenres.collectAsStateWithLifecycle()
     val isHistoryEnabled by viewModel.isHistoryEnabled.collectAsStateWithLifecycle()
+    val contentFilterMode by viewModel.contentFilterMode.collectAsStateWithLifecycle()
 
     var showOnboardingDialog by remember { mutableStateOf(false) }
 
@@ -100,8 +126,17 @@ fun SettingsScreen(
             onDismiss = { showOnboardingDialog = false },
             onSavePreferences = { langs, genres, mode ->
                 viewModel.saveRecommendationPreferences(langs, genres, mode)
+                showOnboardingDialog = false
             }
         )
+    }
+
+    BackHandler(enabled = currentDestination != SettingsDestination.MAIN) {
+        currentDestination = if (currentDestination == SettingsDestination.ADVANCED_CUSTOMIZATION) {
+            SettingsDestination.APPEARANCE
+        } else {
+            SettingsDestination.MAIN
+        }
     }
 
     Column(
@@ -109,14 +144,20 @@ fun SettingsScreen(
             .fillMaxSize()
             .background(colors.background)
     ) {
-        // Settings Header
+        // Top Navigation Header
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 8.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconButton(onClick = onBackClick) {
+            IconButton(onClick = {
+                when (currentDestination) {
+                    SettingsDestination.MAIN -> onBackClick()
+                    SettingsDestination.ADVANCED_CUSTOMIZATION -> currentDestination = SettingsDestination.APPEARANCE
+                    else -> currentDestination = SettingsDestination.MAIN
+                }
+            }) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                     contentDescription = "Back",
@@ -125,7 +166,7 @@ fun SettingsScreen(
             }
             Spacer(modifier = Modifier.width(8.dp))
             Text(
-                text = "SETTINGS",
+                text = currentDestination.title,
                 style = MaterialTheme.typography.titleLarge.copy(
                     fontWeight = FontWeight.Bold,
                     letterSpacing = 1.5.sp,
@@ -134,417 +175,796 @@ fun SettingsScreen(
             )
         }
 
-        // Settings Body Scrollable
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp, vertical = 8.dp)
-        ) {
-            // ================================================================
-            // SECTION 1: APPEARANCE (PHASE C, D, E, F)
-            // ================================================================
-            SettingsSectionHeader(title = "APPEARANCE", icon = Icons.Default.Palette)
+        // Body Content based on destination
+        when (currentDestination) {
+            SettingsDestination.MAIN -> {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    SettingsCategoryCard(
+                        title = "Appearance",
+                        subtitle = "Themes, card styles, and player backgrounds",
+                        icon = Icons.Default.Palette,
+                        onClick = { currentDestination = SettingsDestination.APPEARANCE }
+                    )
 
-            // 1. Official Themes
-            Text(
-                text = "Official Themes (7 Styles)",
-                style = MaterialTheme.typography.labelMedium.copy(
-                    fontWeight = FontWeight.SemiBold,
-                    color = colors.textSecondary
-                )
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                viewModel.officialThemes.forEach { theme ->
-                    val isSelected = theme.id == selectedThemeId
-                    Box(
+                    SettingsCategoryCard(
+                        title = "Audio & Playback",
+                        subtitle = "InnerTubeX lossless streaming, 48kHz 32-bit PCM",
+                        icon = Icons.Default.GraphicEq,
+                        onClick = { currentDestination = SettingsDestination.AUDIO_PLAYBACK }
+                    )
+
+                    SettingsCategoryCard(
+                        title = "Recommendations & Taste",
+                        subtitle = "Tuned genres, languages, and discovery mode",
+                        icon = Icons.Default.Tune,
+                        onClick = { currentDestination = SettingsDestination.RECOMMENDATIONS }
+                    )
+
+                    SettingsCategoryCard(
+                        title = "Content Preferences",
+                        subtitle = if (contentFilterMode == ContentFilterMode.MUSIC_ONLY) "Music Only (Podcasts & Interviews filtered)" else "All Content (Unfiltered)",
+                        icon = Icons.Default.FilterList,
+                        onClick = { currentDestination = SettingsDestination.CONTENT_PREFERENCES }
+                    )
+
+                    SettingsCategoryCard(
+                        title = "Library & Data",
+                        subtitle = "Playlists, saved tracks, and local Room persistence",
+                        icon = Icons.Default.LibraryMusic,
+                        onClick = { currentDestination = SettingsDestination.LIBRARY_DATA }
+                    )
+
+                    SettingsCategoryCard(
+                        title = "Storage & Cache",
+                        subtitle = "Thumbnail cache and temporary media streams",
+                        icon = Icons.Default.Storage,
+                        onClick = { currentDestination = SettingsDestination.STORAGE_CACHE }
+                    )
+
+                    SettingsCategoryCard(
+                        title = "Privacy",
+                        subtitle = "Listening history and 100% offline telemetry guarantee",
+                        icon = Icons.Default.Security,
+                        onClick = { currentDestination = SettingsDestination.PRIVACY }
+                    )
+
+                    SettingsCategoryCard(
+                        title = "About",
+                        subtitle = "STEREO v2.1.0 Master • Zero paid APIs • Open Source",
+                        icon = Icons.Default.Info,
+                        onClick = { currentDestination = SettingsDestination.ABOUT }
+                    )
+
+                    Spacer(modifier = Modifier.height(80.dp))
+                }
+            }
+
+            SettingsDestination.APPEARANCE -> {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                ) {
+                    // 1. Official Themes
+                    SettingsSectionTitle("Official Themes (7 Styles)")
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(theme.background)
-                            .border(
-                                width = if (isSelected) 2.dp else 1.dp,
-                                color = if (isSelected) colors.primaryAccent else theme.surfaceHighlight,
-                                shape = RoundedCornerShape(12.dp)
-                            )
-                            .clickable { viewModel.selectTheme(theme.id) }
-                            .padding(horizontal = 14.dp, vertical = 10.dp)
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                        viewModel.officialThemes.forEach { theme ->
+                            val isSelected = theme.id == selectedThemeId
                             Box(
                                 modifier = Modifier
-                                    .size(16.dp)
-                                    .clip(CircleShape)
-                                    .background(theme.primaryAccent)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = theme.name,
-                                style = MaterialTheme.typography.bodyMedium.copy(
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                    color = theme.textPrimary
-                                )
-                            )
-                        }
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // 2. Card Style Mode (Phase D)
-            Text(
-                text = "Card Style Mode (Phase D)",
-                style = MaterialTheme.typography.labelMedium.copy(
-                    fontWeight = FontWeight.SemiBold,
-                    color = colors.textSecondary
-                )
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                listOf(
-                    CardStyleMode.DEFAULT to "Default Cards",
-                    CardStyleMode.THEME_SPECIFIC to "Theme Cards"
-                ).forEach { (mode, label) ->
-                    val isSelected = cardStyleMode == mode
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(if (isSelected) colors.surfaceHighlight else colors.surfaceElevated)
-                            .border(
-                                width = if (isSelected) 1.5.dp else 0.5.dp,
-                                color = if (isSelected) colors.primaryAccent else colors.surfaceHighlight,
-                                shape = RoundedCornerShape(12.dp)
-                            )
-                            .clickable { viewModel.setCardStyleMode(mode) }
-                            .padding(vertical = 12.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = label,
-                            style = MaterialTheme.typography.bodyMedium.copy(
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                color = if (isSelected) colors.primaryAccent else colors.textPrimary
-                            )
-                        )
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // 3. Custom Player Background (Phase E)
-            Text(
-                text = "Custom Player Background (Phase E)",
-                style = MaterialTheme.typography.labelMedium.copy(
-                    fontWeight = FontWeight.SemiBold,
-                    color = colors.textSecondary
-                )
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                OutlinedButton(
-                    onClick = {
-                        photoPickerLauncher.launch(
-                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                        )
-                    },
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Icon(imageVector = Icons.Default.AddPhotoAlternate, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(text = "Choose Photo")
-                }
-
-                if (wallpaperConfig.customImageUri != null) {
-                    OutlinedButton(
-                        onClick = { viewModel.setCustomPlayerBackground(null) },
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Icon(imageVector = Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(text = "Remove")
-                    }
-                }
-            }
-
-            if (wallpaperConfig.mode == WallpaperMode.CUSTOM_IMAGE) {
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "Blur: ${wallpaperConfig.blurRadius.toInt()}dp",
-                    style = MaterialTheme.typography.bodySmall.copy(color = colors.textSecondary)
-                )
-                Slider(
-                    value = wallpaperConfig.blurRadius,
-                    onValueChange = { viewModel.updateCustomBackgroundParams(it, wallpaperConfig.dimmingAlpha) },
-                    valueRange = 10f..80f,
-                    colors = SliderDefaults.colors(
-                        thumbColor = colors.primaryAccent,
-                        activeTrackColor = colors.primaryAccent
-                    )
-                )
-
-                Text(
-                    text = "Darkening Overlay: ${(wallpaperConfig.dimmingAlpha * 100).toInt()}%",
-                    style = MaterialTheme.typography.bodySmall.copy(color = colors.textSecondary)
-                )
-                Slider(
-                    value = wallpaperConfig.dimmingAlpha,
-                    onValueChange = { viewModel.updateCustomBackgroundParams(wallpaperConfig.blurRadius, it) },
-                    valueRange = 0f..0.9f,
-                    colors = SliderDefaults.colors(
-                        thumbColor = colors.primaryAccent,
-                        activeTrackColor = colors.primaryAccent
-                    )
-                )
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // 4. Batch Playback Control Color (Phase F)
-            Text(
-                text = "Batch Playback Control Colors (Phase F)",
-                style = MaterialTheme.typography.labelMedium.copy(
-                    fontWeight = FontWeight.SemiBold,
-                    color = colors.textSecondary
-                )
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            val batchColorOptions = listOf(
-                null to "Theme Default",
-                0xFFE58B24L to "Amber",
-                0xFFFFD600L to "Yellow",
-                0xFF00B4D8L to "Cyan",
-                0xFF22C55EL to "Green",
-                0xFFEC4899L to "Pink",
-                0xFF9D4EDDL to "Purple",
-                0xFFFFFFFFL to "White"
-            )
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                batchColorOptions.forEach { (colorVal, label) ->
-                    val isSelected = advancedAppearance.batchPlaybackControlColor == colorVal
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(if (isSelected) colors.surfaceHighlight else colors.surfaceElevated)
-                            .border(
-                                width = if (isSelected) 1.5.dp else 0.5.dp,
-                                color = if (isSelected) colors.primaryAccent else colors.surfaceHighlight,
-                                shape = RoundedCornerShape(10.dp)
-                            )
-                            .clickable { viewModel.setBatchControlColor(colorVal) }
-                            .padding(horizontal = 10.dp, vertical = 6.dp)
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            if (colorVal != null) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(12.dp)
-                                        .clip(CircleShape)
-                                        .background(Color(colorVal))
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(theme.background)
+                                    .border(
+                                        width = if (isSelected) 2.dp else 1.dp,
+                                        color = if (isSelected) colors.primaryAccent else theme.surfaceHighlight,
+                                        shape = RoundedCornerShape(12.dp)
+                                    )
+                                    .clickable { viewModel.selectTheme(theme.id) }
+                                    .padding(horizontal = 14.dp, vertical = 10.dp)
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(16.dp)
+                                            .clip(CircleShape)
+                                            .background(theme.primaryAccent)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = theme.name,
+                                        style = MaterialTheme.typography.bodyMedium.copy(
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                            color = theme.textPrimary
+                                        )
+                                    )
+                                }
                             }
-                            Text(
-                                text = label,
-                                style = MaterialTheme.typography.bodySmall.copy(
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                    color = if (isSelected) colors.primaryAccent else colors.textPrimary
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(20.dp))
+
+                    // 2. Card Style Mode
+                    SettingsSectionTitle("Card Style Mode")
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        listOf(
+                            CardStyleMode.DEFAULT to "Default Cards",
+                            CardStyleMode.THEME_SPECIFIC to "Theme Cards"
+                        ).forEach { (mode, label) ->
+                            val isSelected = cardStyleMode == mode
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(if (isSelected) colors.surfaceHighlight else colors.surfaceElevated)
+                                    .border(
+                                        width = if (isSelected) 1.5.dp else 0.5.dp,
+                                        color = if (isSelected) colors.primaryAccent else colors.surfaceHighlight,
+                                        shape = RoundedCornerShape(12.dp)
+                                    )
+                                    .clickable { viewModel.setCardStyleMode(mode) }
+                                    .padding(vertical = 12.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = label,
+                                    style = MaterialTheme.typography.bodyMedium.copy(
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                        color = if (isSelected) colors.primaryAccent else colors.textPrimary
+                                    )
                                 )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(20.dp))
+
+                    // 3. Custom Player Background
+                    SettingsSectionTitle("Player Background")
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = {
+                                photoPickerLauncher.launch(
+                                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                                )
+                            },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Icon(imageVector = Icons.Default.AddPhotoAlternate, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(text = "Choose Photo")
+                        }
+
+                        if (wallpaperConfig.customImageUri != null) {
+                            OutlinedButton(
+                                onClick = { viewModel.setCustomPlayerBackground(null) },
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Icon(imageVector = Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(text = "Remove")
+                            }
+                        }
+                    }
+
+                    if (wallpaperConfig.mode == WallpaperMode.CUSTOM_IMAGE) {
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Text(
+                            text = "Blur: ${wallpaperConfig.blurRadius.toInt()}dp",
+                            style = MaterialTheme.typography.bodySmall.copy(color = colors.textSecondary)
+                        )
+                        Slider(
+                            value = wallpaperConfig.blurRadius,
+                            onValueChange = { viewModel.updateCustomBackgroundParams(it, wallpaperConfig.dimmingAlpha) },
+                            valueRange = 10f..80f,
+                            colors = SliderDefaults.colors(
+                                thumbColor = colors.primaryAccent,
+                                activeTrackColor = colors.primaryAccent
+                            )
+                        )
+
+                        Text(
+                            text = "Darkening Overlay: ${(wallpaperConfig.dimmingAlpha * 100).toInt()}%",
+                            style = MaterialTheme.typography.bodySmall.copy(color = colors.textSecondary)
+                        )
+                        Slider(
+                            value = wallpaperConfig.dimmingAlpha,
+                            onValueChange = { viewModel.updateCustomBackgroundParams(wallpaperConfig.blurRadius, it) },
+                            valueRange = 0f..0.9f,
+                            colors = SliderDefaults.colors(
+                                thumbColor = colors.primaryAccent,
+                                activeTrackColor = colors.primaryAccent
+                            )
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(24.dp))
+
+                    // 4. Advanced Customization Link
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(colors.surfaceElevated)
+                            .border(1.dp, colors.surfaceHighlight, RoundedCornerShape(12.dp))
+                            .clickable { currentDestination = SettingsDestination.ADVANCED_CUSTOMIZATION }
+                            .padding(16.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Advanced Customization",
+                                    style = MaterialTheme.typography.titleMedium.copy(
+                                        fontWeight = FontWeight.Bold,
+                                        color = colors.textPrimary
+                                    )
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = "Batch playback control colors, overrides, and theme reset",
+                                    style = MaterialTheme.typography.bodySmall.copy(color = colors.textSecondary)
+                                )
+                            }
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                contentDescription = null,
+                                tint = colors.textSecondary
                             )
                         }
                     }
+
+                    Spacer(modifier = Modifier.height(80.dp))
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                OutlinedButton(
-                    onClick = { viewModel.resetAdvancedAppearance() },
-                    shape = RoundedCornerShape(10.dp),
-                    modifier = Modifier.fillMaxWidth()
+            SettingsDestination.ADVANCED_CUSTOMIZATION -> {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
                 ) {
-                    Text(text = "Reset Advanced Appearance")
-                }
-                OutlinedButton(
-                    onClick = { viewModel.restoreThemeDefaults() },
-                    shape = RoundedCornerShape(10.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(text = "Restore Theme Defaults")
-                }
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // ================================================================
-            // SECTION 2: AUDIO & PLAYBACK (PHASE G2)
-            // ================================================================
-            SettingsSectionHeader(title = "AUDIO & PLAYBACK", icon = Icons.Default.GraphicEq)
-
-            SettingsInfoRow(title = "Streaming Engine", value = "InnerTubeX Lossless + YouTube Music Fallback")
-            SettingsInfoRow(title = "Output Sample Rate", value = "48000 Hz, 32-bit PCM")
-            SettingsInfoRow(title = "Audio Focus & Headset", value = "Enabled (Auto-pause on call/disconnect)")
-            SettingsInfoRow(title = "Shuffle Algorithm", value = "Balanced Fisher-Yates (Artist Diversity)")
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // ================================================================
-            // SECTION 3: RECOMMENDATIONS & TASTE (PHASE H)
-            // ================================================================
-            SettingsSectionHeader(title = "RECOMMENDATIONS", icon = Icons.Default.Tune)
-
-            Text(
-                text = "Preferred Languages: ${preferredLanguages.joinToString()}",
-                style = MaterialTheme.typography.bodyMedium.copy(color = colors.textPrimary)
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = "Preferred Genres: ${preferredGenres.joinToString()}",
-                style = MaterialTheme.typography.bodyMedium.copy(color = colors.textPrimary)
-            )
-            Spacer(modifier = Modifier.height(10.dp))
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Button(
-                    onClick = { showOnboardingDialog = true },
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = colors.primaryAccent, contentColor = Color.Black),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Icon(imageVector = Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(text = "Tune Taste Preferences", fontWeight = FontWeight.Bold)
-                }
-
-                OutlinedButton(
-                    onClick = { viewModel.resetRecommendationPreferences() },
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(text = "Reset Taste Profile")
-                }
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // ================================================================
-            // SECTION 4: LIBRARY & PRIVACY (PHASE G4, G7)
-            // ================================================================
-            SettingsSectionHeader(title = "LIBRARY & PRIVACY", icon = Icons.Default.Security)
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
+                    SettingsSectionTitle("Batch Playback Control Colors")
+                    Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "Record Listening History",
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            fontWeight = FontWeight.SemiBold,
-                            color = colors.textPrimary
-                        )
-                    )
-                    Text(
-                        text = "Used to power your Daily Mix and listening profile",
+                        text = "Instantly tint play, pause, shuffle, and seek controls in the player.",
                         style = MaterialTheme.typography.bodySmall.copy(color = colors.textSecondary)
                     )
-                }
-                Switch(
-                    checked = isHistoryEnabled,
-                    onCheckedChange = { viewModel.setHistoryEnabled(it) },
-                    colors = SwitchDefaults.colors(
-                        checkedThumbColor = Color.Black,
-                        checkedTrackColor = colors.primaryAccent
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    val batchColorOptions = listOf(
+                        null to "Theme Default",
+                        0xFFE58B24L to "Amber",
+                        0xFFFFD600L to "Yellow",
+                        0xFF00B4D8L to "Cyan",
+                        0xFF22C55EL to "Green",
+                        0xFFEC4899L to "Pink",
+                        0xFF9D4EDDL to "Purple",
+                        0xFFFFFFFFL to "White"
                     )
-                )
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        batchColorOptions.forEach { (colorVal, label) ->
+                            val isSelected = advancedAppearance.batchPlaybackControlColor == colorVal
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(if (isSelected) colors.surfaceHighlight else colors.surfaceElevated)
+                                    .border(
+                                        width = if (isSelected) 1.5.dp else 0.5.dp,
+                                        color = if (isSelected) colors.primaryAccent else colors.surfaceHighlight,
+                                        shape = RoundedCornerShape(10.dp)
+                                    )
+                                    .clickable { viewModel.setBatchControlColor(colorVal) }
+                                    .padding(horizontal = 12.dp, vertical = 8.dp)
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    if (colorVal != null) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(12.dp)
+                                                .clip(CircleShape)
+                                                .background(Color(colorVal))
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                    }
+                                    Text(
+                                        text = label,
+                                        style = MaterialTheme.typography.bodySmall.copy(
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                            color = if (isSelected) colors.primaryAccent else colors.textPrimary
+                                        )
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(24.dp))
+
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = {
+                                viewModel.resetAdvancedAppearance()
+                                Toast.makeText(context, "Advanced appearance reset", Toast.LENGTH_SHORT).show()
+                            },
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(text = "Reset Advanced Appearance")
+                        }
+
+                        OutlinedButton(
+                            onClick = {
+                                viewModel.restoreThemeDefaults()
+                                Toast.makeText(context, "Theme defaults restored", Toast.LENGTH_SHORT).show()
+                            },
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(text = "Restore Theme Defaults")
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(80.dp))
+                }
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
-            OutlinedButton(
-                onClick = { viewModel.clearListeningHistory() },
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Icon(imageVector = Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(16.dp))
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(text = "Clear Listening History")
+            SettingsDestination.AUDIO_PLAYBACK -> {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                ) {
+                    SettingsSectionTitle("Streaming & Playback Engine")
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    SettingsDetailCard {
+                        SettingsInfoRow(title = "Streaming Engine", value = "InnerTubeX Lossless + YouTube Music Fallback")
+                        SettingsInfoRow(title = "Output Sample Rate", value = "48000 Hz, 32-bit Float / PCM")
+                        SettingsInfoRow(title = "Audio Pipeline", value = "Bit-perfect AudioTrack via Media3 ExoPlayer")
+                        SettingsInfoRow(title = "Audio Focus Handling", value = "Automatic ducking / pause on phone calls")
+                        SettingsInfoRow(title = "Headphone Disconnect", value = "Auto-pause on unplug / Bluetooth disconnect")
+                        SettingsInfoRow(title = "Shuffle Algorithm", value = "Balanced Fisher-Yates (Artist Diversity)")
+                        SettingsInfoRow(title = "Decoder Buffer", value = "2.5 MB Low-latency Ring Buffer")
+                    }
+
+                    Spacer(modifier = Modifier.height(80.dp))
+                }
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            SettingsDestination.RECOMMENDATIONS -> {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                ) {
+                    SettingsSectionTitle("Taste Profile & Signals")
+                    Spacer(modifier = Modifier.height(8.dp))
 
-            // ================================================================
-            // SECTION 5: STORAGE (PHASE G5)
-            // ================================================================
-            SettingsSectionHeader(title = "STORAGE", icon = Icons.Default.Storage)
+                    SettingsDetailCard {
+                        SettingsInfoRow(title = "Preferred Languages", value = preferredLanguages.joinToString())
+                        SettingsInfoRow(title = "Preferred Genres", value = preferredGenres.joinToString())
+                        SettingsInfoRow(title = "Recommendation Sources", value = "YouTube Music Home Shelves + Song Radio")
+                        SettingsInfoRow(title = "Taste Signal Weights", value = "Skip (-20), Listen 30s+ (+30), Like (+30)")
+                        SettingsInfoRow(title = "Cross-Section Deduplication", value = "Strict Unique Filtering Active")
+                    }
 
-            OutlinedButton(
-                onClick = { viewModel.clearCache() },
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Icon(imageVector = Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(text = "Clear Thumbnail & Audio Cache")
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Button(
+                            onClick = { showOnboardingDialog = true },
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = colors.primaryAccent, contentColor = Color.Black),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(imageVector = Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(text = "Tune Taste Preferences", fontWeight = FontWeight.Bold)
+                        }
+
+                        OutlinedButton(
+                            onClick = {
+                                viewModel.resetRecommendationPreferences()
+                                Toast.makeText(context, "Taste preferences reset to defaults", Toast.LENGTH_SHORT).show()
+                            },
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(text = "Reset Taste Profile")
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(80.dp))
+                }
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            SettingsDestination.CONTENT_PREFERENCES -> {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                ) {
+                    SettingsSectionTitle("Content Filtering")
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Control what catalog items appear in Search, Home discovery shelves, and recommendations.",
+                        style = MaterialTheme.typography.bodySmall.copy(color = colors.textSecondary)
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
 
-            // ================================================================
-            // SECTION 6: ABOUT (PHASE G8)
-            // ================================================================
-            SettingsSectionHeader(title = "ABOUT", icon = Icons.Default.Info)
+                    // Option 1: Music Only
+                    val isMusicOnly = contentFilterMode == ContentFilterMode.MUSIC_ONLY
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(if (isMusicOnly) colors.surfaceHighlight else colors.surfaceElevated)
+                            .border(
+                                width = if (isMusicOnly) 1.5.dp else 0.5.dp,
+                                color = if (isMusicOnly) colors.primaryAccent else colors.surfaceHighlight,
+                                shape = RoundedCornerShape(12.dp)
+                            )
+                            .clickable { viewModel.setContentFilterMode(ContentFilterMode.MUSIC_ONLY) }
+                            .padding(16.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.Top) {
+                            Icon(
+                                imageVector = if (isMusicOnly) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
+                                contentDescription = null,
+                                tint = if (isMusicOnly) colors.primaryAccent else colors.textSecondary,
+                                modifier = Modifier.size(22.dp)
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column {
+                                Text(
+                                    text = "Music Only (Recommended)",
+                                    style = MaterialTheme.typography.titleMedium.copy(
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isMusicOnly) colors.primaryAccent else colors.textPrimary
+                                    )
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "Strictly music tracks, albums, singles, remixes, and official music videos. Suppresses podcasts, talk shows, interviews, reaction videos, commentary, and audiobooks.",
+                                    style = MaterialTheme.typography.bodySmall.copy(color = colors.textSecondary)
+                                )
+                            }
+                        }
+                    }
 
-            SettingsInfoRow(title = "Application", value = "STEREO")
-            SettingsInfoRow(title = "Version", value = "v2.0 (Phase 2 Master Build)")
-            SettingsInfoRow(title = "Platform", value = "Native Android (Kotlin + Jetpack Compose)")
-            SettingsInfoRow(title = "Architecture", value = "Clean MVVM + Media3 ExoPlayer + Koin DI")
-            SettingsInfoRow(title = "License", value = "Open Source (Zero Paid APIs)")
+                    Spacer(modifier = Modifier.height(12.dp))
 
-            Spacer(modifier = Modifier.height(120.dp))
+                    // Option 2: All Content
+                    val isAllContent = contentFilterMode == ContentFilterMode.ALL_CONTENT
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(if (isAllContent) colors.surfaceHighlight else colors.surfaceElevated)
+                            .border(
+                                width = if (isAllContent) 1.5.dp else 0.5.dp,
+                                color = if (isAllContent) colors.primaryAccent else colors.surfaceHighlight,
+                                shape = RoundedCornerShape(12.dp)
+                            )
+                            .clickable { viewModel.setContentFilterMode(ContentFilterMode.ALL_CONTENT) }
+                            .padding(16.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.Top) {
+                            Icon(
+                                imageVector = if (isAllContent) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
+                                contentDescription = null,
+                                tint = if (isAllContent) colors.primaryAccent else colors.textSecondary,
+                                modifier = Modifier.size(22.dp)
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column {
+                                Text(
+                                    text = "All Content",
+                                    style = MaterialTheme.typography.titleMedium.copy(
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isAllContent) colors.primaryAccent else colors.textPrimary
+                                    )
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "Disables nonmusic filtering. Displays all catalog results including podcasts, interviews, commentary, and live broadcasts.",
+                                    style = MaterialTheme.typography.bodySmall.copy(color = colors.textSecondary)
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(80.dp))
+                }
+            }
+
+            SettingsDestination.LIBRARY_DATA -> {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                ) {
+                    SettingsSectionTitle("Library & Storage Architecture")
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    SettingsDetailCard {
+                        SettingsInfoRow(title = "Database Engine", value = "Room 2.6.1 (SQLite)")
+                        SettingsInfoRow(title = "Storage Location", value = "Local Private App Sandbox")
+                        SettingsInfoRow(title = "Liked Songs Index", value = "Indexed with timestamp & listen metrics")
+                        SettingsInfoRow(title = "Playlists", value = "Custom playlists with drag-and-drop order")
+                        SettingsInfoRow(title = "Cloud Synchronization", value = "None (Offline-first local privacy)")
+                    }
+
+                    Spacer(modifier = Modifier.height(80.dp))
+                }
+            }
+
+            SettingsDestination.STORAGE_CACHE -> {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                ) {
+                    SettingsSectionTitle("Temporary Files & Cache")
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    SettingsDetailCard {
+                        SettingsInfoRow(title = "Image Cache", value = "Coil / Glide In-Memory & Disk Cache")
+                        SettingsInfoRow(title = "Audio Cache", value = "ExoPlayer Media3 Segment Ring Cache")
+                        SettingsInfoRow(title = "Directory", value = context.cacheDir.absolutePath)
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    OutlinedButton(
+                        onClick = {
+                            viewModel.clearCache()
+                            Toast.makeText(context, "Thumbnail and audio cache cleared", Toast.LENGTH_SHORT).show()
+                        },
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(imageVector = Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(text = "Clear Thumbnail & Audio Cache")
+                    }
+
+                    Spacer(modifier = Modifier.height(80.dp))
+                }
+            }
+
+            SettingsDestination.PRIVACY -> {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                ) {
+                    SettingsSectionTitle("Privacy Controls")
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(colors.surfaceElevated)
+                            .border(1.dp, colors.surfaceHighlight, RoundedCornerShape(12.dp))
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Record Listening History",
+                                style = MaterialTheme.typography.bodyMedium.copy(
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = colors.textPrimary
+                                )
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "Used strictly on-device to power your Daily Mix and taste profile",
+                                style = MaterialTheme.typography.bodySmall.copy(color = colors.textSecondary)
+                            )
+                        }
+                        Switch(
+                            checked = isHistoryEnabled,
+                            onCheckedChange = { viewModel.setHistoryEnabled(it) },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = Color.Black,
+                                checkedTrackColor = colors.primaryAccent
+                            )
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    OutlinedButton(
+                        onClick = {
+                            viewModel.clearListeningHistory()
+                            Toast.makeText(context, "Listening history cleared", Toast.LENGTH_SHORT).show()
+                        },
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(imageVector = Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(text = "Clear Listening History")
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    SettingsDetailCard {
+                        SettingsInfoRow(title = "Telemetry / Tracking", value = "0% (Zero analytics SDKs)")
+                        SettingsInfoRow(title = "Account Requirement", value = "None (No login needed)")
+                        SettingsInfoRow(title = "Data Storage", value = "100% On-Device Local SQLite")
+                    }
+
+                    Spacer(modifier = Modifier.height(80.dp))
+                }
+            }
+
+            SettingsDestination.ABOUT -> {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                ) {
+                    SettingsSectionTitle("About STEREO")
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    SettingsDetailCard {
+                        SettingsInfoRow(title = "Application", value = "STEREO")
+                        SettingsInfoRow(title = "Release", value = "v2.1.0 Master Release")
+                        SettingsInfoRow(title = "Package", value = "com.nova.music")
+                        SettingsInfoRow(title = "Platform", value = "Native Android (Kotlin + Jetpack Compose)")
+                        SettingsInfoRow(title = "Architecture", value = "Clean MVVM + Media3 ExoPlayer + Koin DI")
+                        SettingsInfoRow(title = "License", value = "Open Source (₹0 Budget, Zero Paid APIs)")
+                        SettingsInfoRow(title = "Audio Engine", value = "InnerTubeX Lossless Extractor")
+                    }
+
+                    Spacer(modifier = Modifier.height(80.dp))
+                }
+            }
         }
     }
 }
 
 @Composable
-private fun SettingsSectionHeader(title: String, icon: androidx.compose.ui.graphics.vector.ImageVector) {
+private fun SettingsCategoryCard(
+    title: String,
+    subtitle: String,
+    icon: ImageVector,
+    onClick: () -> Unit
+) {
     val colors = StereoTheme.colors
-    Row(
+    Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .clip(RoundedCornerShape(12.dp))
+            .background(colors.surfaceElevated)
+            .border(1.dp, colors.surfaceHighlight, RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 14.dp)
     ) {
-        Icon(imageVector = icon, contentDescription = null, tint = colors.primaryAccent, modifier = Modifier.size(20.dp))
-        Spacer(modifier = Modifier.width(8.dp))
-        Text(
-            text = title,
-            style = MaterialTheme.typography.labelMedium.copy(
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 1.sp,
-                color = colors.primaryAccent
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(colors.surfaceHighlight),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = colors.primaryAccent,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+            Spacer(modifier = Modifier.width(14.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.bodyLarge.copy(
+                        fontWeight = FontWeight.SemiBold,
+                        color = colors.textPrimary
+                    )
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        color = colors.textSecondary,
+                        lineHeight = 16.sp
+                    )
+                )
+            }
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = colors.textSecondary,
+                modifier = Modifier.size(20.dp)
             )
+        }
+    }
+}
+
+@Composable
+private fun SettingsSectionTitle(title: String) {
+    val colors = StereoTheme.colors
+    Text(
+        text = title,
+        style = MaterialTheme.typography.labelMedium.copy(
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 1.sp,
+            color = colors.primaryAccent
         )
+    )
+}
+
+@Composable
+private fun SettingsDetailCard(content: @Composable () -> Unit) {
+    val colors = StereoTheme.colors
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(colors.surfaceElevated)
+            .border(1.dp, colors.surfaceHighlight, RoundedCornerShape(12.dp))
+            .padding(16.dp)
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            content()
+        }
     }
 }
 
@@ -554,7 +974,7 @@ private fun SettingsInfoRow(title: String, value: String) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 4.dp),
+            .padding(vertical = 2.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {

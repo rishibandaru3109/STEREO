@@ -11,6 +11,7 @@ import com.nova.music.core.designsystem.theme.ThemeRepository
 import com.nova.music.core.designsystem.wallpaper.WallpaperConfig
 import com.nova.music.core.designsystem.wallpaper.WallpaperMode
 import com.nova.music.core.designsystem.wallpaper.WallpaperRepository
+import com.nova.music.domain.repository.ContentFilterMode
 import com.nova.music.domain.repository.HistoryRepository
 import com.nova.music.domain.repository.MusicPreferencesRepository
 import kotlinx.coroutines.flow.SharingStarted
@@ -50,6 +51,9 @@ class SettingsViewModel(
 
     val isHistoryEnabled: StateFlow<Boolean> = preferencesRepository.isHistoryEnabled
         .stateIn(viewModelScope, SharingStarted.Eagerly, true)
+
+    val contentFilterMode: StateFlow<ContentFilterMode> = preferencesRepository.contentFilterMode
+        .stateIn(viewModelScope, SharingStarted.Eagerly, ContentFilterMode.MUSIC_ONLY)
 
     val officialThemes = ThemePresets.officialThemes
 
@@ -115,6 +119,10 @@ class SettingsViewModel(
 
     fun setHistoryEnabled(enabled: Boolean) {
         viewModelScope.launch { preferencesRepository.setHistoryEnabled(enabled) }
+    }
+
+    fun setContentFilterMode(mode: ContentFilterMode) {
+        viewModelScope.launch { preferencesRepository.setContentFilterMode(mode) }
     }
 
     fun clearListeningHistory() {

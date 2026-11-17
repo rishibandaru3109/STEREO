@@ -11,4 +11,6 @@ interface MusicExtractor {
     suspend fun search(query: String): Result<List<Track>>
     suspend fun resolveAudioStream(trackId: String): Result<AudioStream>
     suspend fun getTrackDetails(trackId: String): Result<Track>
+    suspend fun getSongRadio(trackId: String): Result<List<Track>> = Result.success(emptyList())
+    suspend fun getHomeShelves(): Result<List<Track>> = Result.success(emptyList())
 }

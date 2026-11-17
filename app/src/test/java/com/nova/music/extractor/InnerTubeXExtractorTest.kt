@@ -73,4 +73,21 @@ class InnerTubeXExtractorTest {
             assertTrue("Stream URL must target Google Video CDN", stream.url.contains("googlevideo.com"))
         }
     }
+
+    @Test
+    fun testLiveSongRadioRelevance() = runBlocking {
+        val seedVideoId = "4NRXx6U8ABQ" // Blinding Lights - The Weeknd
+        val result = extractor.getSongRadio(seedVideoId)
+        println("=== LIVE SONG RADIO SEED: Blinding Lights ($seedVideoId) ===")
+        println("isSuccess: ${result.isSuccess}")
+        if (result.isFailure) {
+            println("Exception: ${result.exceptionOrNull()?.message}")
+        } else {
+            val radioTracks = result.getOrNull() ?: emptyList()
+            println("Fetched ${radioTracks.size} candidate tracks from YouTube Music song radio graph:")
+            radioTracks.take(10).forEachIndexed { index, track ->
+                println("${index + 1}. [${track.id}] ${track.title} - ${track.artist} (${track.durationSeconds}s)")
+            }
+        }
+    }
 }

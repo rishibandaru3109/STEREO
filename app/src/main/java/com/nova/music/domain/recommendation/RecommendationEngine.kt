@@ -73,7 +73,7 @@ class RecommendationEngineImpl : RecommendationEngine {
         }
 
         // 4. WEEKLY DISCOVER (Phase B1: Fresh discovery music, strictly excludes Daily Mix and History)
-        val discoverTracks = generateWeeklyDiscover(validCandidates, knownTrackIds, consumedTrackIds)
+        val discoverTracks = generateWeeklyDiscover(profile, validCandidates, knownTrackIds, consumedTrackIds)
         if (discoverTracks.isNotEmpty()) {
             sections.add(
                 RecommendationSection(
@@ -124,8 +124,9 @@ class RecommendationEngineImpl : RecommendationEngine {
         if (!profile.isColdStart && profile.topArtists.isNotEmpty()) {
             // Mix 1: Top Artist #1 Focus + Related Candidates
             val artist1 = profile.topArtists.first().artistName
-            val artist1Tracks = candidates.filter { it.artist.contains(artist1, ignoreCase = true) }
-            val otherCandidates = candidates.filter { !it.artist.contains(artist1, ignoreCase = true) }
+            val availableForMix1 = candidates.filter { it.id !in consumedTrackIds }
+            val artist1Tracks = availableForMix1.filter { it.artist.contains(artist1, ignoreCase = true) }
+            val otherCandidates = availableForMix1.filter { !it.artist.contains(artist1, ignoreCase = true) }
             val mix1Pool = (artist1Tracks.take(6) + otherCandidates.shuffled(Random(101)).take(8))
             val mix1Tracks = diversifyTracks(mix1Pool.distinctBy { it.id }, maxConsecutivePerArtist = 2)
 
@@ -216,13 +217,18 @@ class RecommendationEngineImpl : RecommendationEngine {
     }
 
     private fun generateWeeklyDiscover(
+        profile: ListeningProfile,
         candidates: List<Track>,
         knownTrackIds: Set<String>,
         consumedTrackIds: MutableSet<String>
     ): List<Track> {
-        // Strictly exclude tracks already selected in Daily Mix AND tracks in listening history
+        // Strictly exclude tracks already selected in Daily Mix AND tracks in listening history.
+        // Also prioritize fresh artists outside the top established artist so Weekly Discover is genuinely novel.
+        val topArtist = profile.topArtists.firstOrNull()?.artistName
         val freshDiscoveryPool = candidates.filter { candidate ->
-            !consumedTrackIds.contains(candidate.id) && !knownTrackIds.contains(candidate.id)
+            !consumedTrackIds.contains(candidate.id) &&
+            !knownTrackIds.contains(candidate.id) &&
+            (topArtist == null || !candidate.artist.contains(topArtist, ignoreCase = true))
         }
 
         val diversified = diversifyTracks(freshDiscoveryPool, maxConsecutivePerArtist = 2).take(15)
@@ -241,7 +247,7 @@ class RecommendationEngineImpl : RecommendationEngine {
         if (profile.topArtists.isNotEmpty()) {
             val topArtist = profile.topArtists.first().artistName
             val artistTracks = candidates
-                .filter { it.artist.contains(topArtist, ignoreCase = true) }
+                .filter { it.id !in consumedTrackIds && it.artist.contains(topArtist, ignoreCase = true) }
                 .take(12)
 
             if (artistTracks.isNotEmpty()) {

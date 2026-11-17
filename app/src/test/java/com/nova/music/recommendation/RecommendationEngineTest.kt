@@ -81,15 +81,20 @@ class RecommendationEngineTest {
         )
         assertFalse(profile.isColdStart)
 
-        val candidates = listOf(
+        val candidates = mutableListOf(
             vivaLaVida,
-            yellow,
-            Track("cp_3", "Fix You", "Coldplay"),
-            Track("cp_4", "Paradise", "Coldplay"),
-            Track("oa_1", "Wonderwall", "Oasis"),
-            Track("oa_2", "Don't Look Back in Anger", "Oasis"),
-            Track("ke_1", "Somewhere Only We Know", "Keane")
-        )
+            yellow
+        ).apply {
+            for (i in 3..15) {
+                add(Track("cp_$i", "Coldplay Track $i", "Coldplay"))
+            }
+            for (i in 1..10) {
+                add(Track("oa_$i", "Oasis Track $i", "Oasis"))
+            }
+            for (i in 1..10) {
+                add(Track("ke_$i", "Keane Track $i", "Keane"))
+            }
+        }
 
         val sections = engine.generateSections(
             profile = profile,
