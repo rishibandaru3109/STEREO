@@ -374,16 +374,21 @@ fun SettingsScreen(
             }
 
             Spacer(modifier = Modifier.height(12.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 OutlinedButton(
                     onClick = { viewModel.resetAdvancedAppearance() },
-                    shape = RoundedCornerShape(10.dp)
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(text = "Reset Advanced Appearance")
                 }
                 OutlinedButton(
                     onClick = { viewModel.restoreThemeDefaults() },
-                    shape = RoundedCornerShape(10.dp)
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(text = "Restore Theme Defaults")
                 }
@@ -418,20 +423,25 @@ fun SettingsScreen(
                 style = MaterialTheme.typography.bodyMedium.copy(color = colors.textPrimary)
             )
             Spacer(modifier = Modifier.height(10.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 Button(
                     onClick = { showOnboardingDialog = true },
                     shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = colors.primaryAccent, contentColor = Color.Black)
+                    colors = ButtonDefaults.buttonColors(containerColor = colors.primaryAccent, contentColor = Color.Black),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                     Icon(imageVector = Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text(text = "Tune Preferences", fontWeight = FontWeight.Bold)
+                    Text(text = "Tune Taste Preferences", fontWeight = FontWeight.Bold)
                 }
 
                 OutlinedButton(
                     onClick = { viewModel.resetRecommendationPreferences() },
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(text = "Reset Taste Profile")
                 }
@@ -545,18 +555,23 @@ private fun SettingsInfoRow(title: String, value: String) {
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 4.dp),
-        horizontalArrangement = Arrangement.SpaceBetween
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
             text = title,
-            style = MaterialTheme.typography.bodySmall.copy(color = colors.textSecondary)
+            style = MaterialTheme.typography.bodySmall.copy(color = colors.textSecondary),
+            modifier = Modifier.weight(1f)
         )
+        Spacer(modifier = Modifier.width(12.dp))
         Text(
             text = value,
             style = MaterialTheme.typography.bodySmall.copy(
                 fontWeight = FontWeight.Medium,
                 color = colors.textPrimary
-            )
+            ),
+            textAlign = androidx.compose.ui.text.style.TextAlign.End,
+            modifier = Modifier.weight(1.5f)
         )
     }
 }
