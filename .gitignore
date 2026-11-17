@@ -18,4 +18,6 @@ app/build/
 scratch/
 *_reference/
 *.txt
+test-output/
+
 
