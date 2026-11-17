@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.RestartAlt
+import androidx.compose.material.icons.filled.Wallpaper
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -64,6 +65,7 @@ fun ThemeGalleryScreen(
     viewModel: ThemeViewModel,
     onBackClick: (() -> Unit)? = null,
     onCreateCustomTheme: () -> Unit = {},
+    onOpenWallpaperStudio: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val currentThemeId by viewModel.currentThemeId.collectAsStateWithLifecycle()
@@ -151,16 +153,16 @@ fun ThemeGalleryScreen(
             }
         }
 
-        // Action Row: Theme Studio & Import
+        // Action Row: Theme Studio, Wallpaper Studio & Import
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 20.dp, vertical = 4.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Button(
                 onClick = onCreateCustomTheme,
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.weight(1.1f),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = activeColors.primaryAccent,
                     contentColor = if (activeColors.isDark) Color.Black else Color.White
@@ -170,17 +172,17 @@ fun ThemeGalleryScreen(
                 Icon(
                     imageVector = Icons.Default.Add,
                     contentDescription = null,
-                    modifier = Modifier.size(18.dp)
+                    modifier = Modifier.size(16.dp)
                 )
-                Spacer(modifier = Modifier.width(6.dp))
+                Spacer(modifier = Modifier.width(4.dp))
                 Text(
-                    text = "Create Theme",
-                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold)
+                    text = "Theme Studio",
+                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
                 )
             }
 
             OutlinedButton(
-                onClick = { showImportDialog = true },
+                onClick = onOpenWallpaperStudio,
                 modifier = Modifier.weight(1f),
                 colors = ButtonDefaults.outlinedButtonColors(
                     contentColor = activeColors.textPrimary
@@ -189,14 +191,36 @@ fun ThemeGalleryScreen(
                 shape = RoundedCornerShape(12.dp)
             ) {
                 Icon(
+                    imageVector = Icons.Default.Wallpaper,
+                    contentDescription = null,
+                    tint = activeColors.primaryAccent,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = "Wallpaper",
+                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
+                )
+            }
+
+            OutlinedButton(
+                onClick = { showImportDialog = true },
+                modifier = Modifier.weight(0.9f),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor = activeColors.textSecondary
+                ),
+                border = androidx.compose.foundation.BorderStroke(1.dp, activeColors.surfaceHighlight),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Icon(
                     imageVector = Icons.Default.Download,
                     contentDescription = null,
-                    modifier = Modifier.size(18.dp)
+                    modifier = Modifier.size(16.dp)
                 )
-                Spacer(modifier = Modifier.width(6.dp))
+                Spacer(modifier = Modifier.width(4.dp))
                 Text(
-                    text = "Import JSON",
-                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold)
+                    text = "Import",
+                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
                 )
             }
         }

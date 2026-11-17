@@ -15,4 +15,7 @@ data class Track(
             val seconds = durationSeconds % 60
             return "%d:%02d".format(minutes, seconds)
         }
+
+    val artworkUrl: String
+        get() = thumbnailUrl
 }

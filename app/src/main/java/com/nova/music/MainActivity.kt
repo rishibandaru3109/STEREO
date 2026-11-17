@@ -26,6 +26,8 @@ import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nova.music.core.designsystem.theme.StereoTheme
+import com.nova.music.core.designsystem.wallpaper.WallpaperBackdrop
+import com.nova.music.core.designsystem.wallpaper.WallpaperConfig
 import com.nova.music.feature.player.FullPlayerSheet
 import com.nova.music.feature.player.MiniPlayer
 import com.nova.music.feature.player.PlayerViewModel
@@ -34,12 +36,15 @@ import com.nova.music.feature.search.SearchViewModel
 import com.nova.music.feature.theme.ThemeGalleryScreen
 import com.nova.music.feature.theme.ThemeStudioScreen
 import com.nova.music.feature.theme.ThemeViewModel
+import com.nova.music.feature.wallpaper.WallpaperStudioScreen
+import com.nova.music.feature.wallpaper.WallpaperViewModel
 import org.koin.androidx.compose.koinViewModel
 
 enum class MainScreen {
     SEARCH,
     THEMES,
-    THEME_STUDIO
+    THEME_STUDIO,
+    WALLPAPER_STUDIO
 }
 
 class MainActivity : ComponentActivity() {
@@ -68,19 +73,28 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun StereoApp() {
     val themeViewModel: ThemeViewModel = koinViewModel()
+    val wallpaperViewModel: WallpaperViewModel = koinViewModel()
     val currentColors by themeViewModel.currentTheme.collectAsStateWithLifecycle()
+    val wallpaperConfig by wallpaperViewModel.wallpaperConfig.collectAsStateWithLifecycle()
 
     StereoTheme(colors = currentColors) {
         val searchViewModel: SearchViewModel = koinViewModel()
         val playerViewModel: PlayerViewModel = koinViewModel()
+        val playbackState by playerViewModel.playbackState.collectAsStateWithLifecycle()
         var currentScreen by remember { mutableStateOf(MainScreen.SEARCH) }
         var isFullPlayerExpanded by remember { mutableStateOf(false) }
 
         BackHandler(enabled = currentScreen != MainScreen.SEARCH) {
             currentScreen = when (currentScreen) {
-                MainScreen.THEME_STUDIO -> MainScreen.THEMES
+                MainScreen.THEME_STUDIO, MainScreen.WALLPAPER_STUDIO -> MainScreen.THEMES
                 else -> MainScreen.SEARCH
             }
+        }
+
+        val effectiveRootWallpaper = if (!wallpaperConfig.applyToPlayerOnly) {
+            wallpaperConfig
+        } else {
+            WallpaperConfig() // Default solid theme background for browse screens
         }
 
         Scaffold(
@@ -91,51 +105,63 @@ fun StereoApp() {
                 .navigationBarsPadding(),
             containerColor = currentColors.background
         ) { innerPadding ->
-            Box(
+            WallpaperBackdrop(
+                config = effectiveRootWallpaper,
+                artworkUrl = playbackState.currentTrack?.artworkUrl,
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(innerPadding)
             ) {
-                when (currentScreen) {
-                    MainScreen.SEARCH -> {
-                        SearchScreen(
-                            viewModel = searchViewModel,
-                            onOpenThemeGallery = { currentScreen = MainScreen.THEMES },
-                            modifier = Modifier.fillMaxSize()
-                        )
+                Box(modifier = Modifier.fillMaxSize()) {
+                    when (currentScreen) {
+                        MainScreen.SEARCH -> {
+                            SearchScreen(
+                                viewModel = searchViewModel,
+                                onOpenThemeGallery = { currentScreen = MainScreen.THEMES },
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
+                        MainScreen.THEMES -> {
+                            ThemeGalleryScreen(
+                                viewModel = themeViewModel,
+                                onBackClick = { currentScreen = MainScreen.SEARCH },
+                                onCreateCustomTheme = { currentScreen = MainScreen.THEME_STUDIO },
+                                onOpenWallpaperStudio = { currentScreen = MainScreen.WALLPAPER_STUDIO },
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
+                        MainScreen.THEME_STUDIO -> {
+                            ThemeStudioScreen(
+                                viewModel = themeViewModel,
+                                initialTheme = currentColors,
+                                onBackClick = { currentScreen = MainScreen.THEMES },
+                                onThemeSaved = { currentScreen = MainScreen.THEMES },
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
+                        MainScreen.WALLPAPER_STUDIO -> {
+                            WallpaperStudioScreen(
+                                viewModel = wallpaperViewModel,
+                                onBackClick = { currentScreen = MainScreen.THEMES },
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
                     }
-                    MainScreen.THEMES -> {
-                        ThemeGalleryScreen(
-                            viewModel = themeViewModel,
-                            onBackClick = { currentScreen = MainScreen.SEARCH },
-                            onCreateCustomTheme = { currentScreen = MainScreen.THEME_STUDIO },
-                            modifier = Modifier.fillMaxSize()
-                        )
-                    }
-                    MainScreen.THEME_STUDIO -> {
-                        ThemeStudioScreen(
-                            viewModel = themeViewModel,
-                            initialTheme = currentColors,
-                            onBackClick = { currentScreen = MainScreen.THEMES },
-                            onThemeSaved = { currentScreen = MainScreen.THEMES },
-                            modifier = Modifier.fillMaxSize()
-                        )
-                    }
-                }
 
-                // Floating Mini-Player docked at the bottom across all screens
-                MiniPlayer(
-                    viewModel = playerViewModel,
-                    onExpandClick = { isFullPlayerExpanded = true },
-                    modifier = Modifier.align(Alignment.BottomCenter)
-                )
-
-                // Full Screen Player Modal Sheet
-                if (isFullPlayerExpanded) {
-                    FullPlayerSheet(
+                    // Floating Mini-Player docked at the bottom across all screens
+                    MiniPlayer(
                         viewModel = playerViewModel,
-                        onDismissRequest = { isFullPlayerExpanded = false }
+                        onExpandClick = { isFullPlayerExpanded = true },
+                        modifier = Modifier.align(Alignment.BottomCenter)
                     )
+
+                    // Full Screen Player Modal Sheet
+                    if (isFullPlayerExpanded) {
+                        FullPlayerSheet(
+                            viewModel = playerViewModel,
+                            onDismissRequest = { isFullPlayerExpanded = false }
+                        )
+                    }
                 }
             }
         }

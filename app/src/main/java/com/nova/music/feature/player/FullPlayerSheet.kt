@@ -46,6 +46,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -55,8 +56,11 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.nova.music.core.designsystem.theme.StereoTheme
+import com.nova.music.core.designsystem.wallpaper.WallpaperBackdrop
+import com.nova.music.feature.wallpaper.WallpaperViewModel
 import com.nova.music.domain.model.PlayerStatus
 import com.nova.music.domain.model.RepeatMode
+import org.koin.androidx.compose.koinViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -68,20 +72,26 @@ fun FullPlayerSheet(
     val track = state.currentTrack ?: return
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val colors = StereoTheme.colors
+    val wallpaperViewModel: WallpaperViewModel = koinViewModel()
+    val wallpaperConfig by wallpaperViewModel.wallpaperConfig.collectAsStateWithLifecycle()
 
     ModalBottomSheet(
         onDismissRequest = onDismissRequest,
         sheetState = sheetState,
-        containerColor = colors.playerBackground,
+        containerColor = Color.Transparent,
         dragHandle = null
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 24.dp)
-                .padding(bottom = 32.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+        WallpaperBackdrop(
+            config = wallpaperConfig,
+            artworkUrl = track.artworkUrl
         ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 24.dp)
+                    .padding(bottom = 32.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
             // Top Bar with Dismiss Icon and STEREO Label
             Row(
                 modifier = Modifier
@@ -319,6 +329,7 @@ fun FullPlayerSheet(
             }
         }
     }
+}
 }
 
 private fun formatTime(ms: Long): String {
