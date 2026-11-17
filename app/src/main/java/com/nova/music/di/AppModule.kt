@@ -21,9 +21,12 @@ import com.nova.music.core.designsystem.wallpaper.WallpaperPreferencesRepository
 import com.nova.music.core.designsystem.wallpaper.WallpaperRepository
 import com.nova.music.data.extractor.InnerTubeXExtractor
 import com.nova.music.data.extractor.YouTubeMusicExtractor
+import com.nova.music.data.repository.HistoryRepositoryImpl
 import com.nova.music.data.repository.LikedSongsRepositoryImpl
 import com.nova.music.data.repository.MusicRepositoryImpl
 import com.nova.music.data.repository.PlaylistRepositoryImpl
+import com.nova.music.data.repository.QueuePersistenceRepository
+import com.nova.music.domain.repository.HistoryRepository
 import com.nova.music.domain.repository.LikedSongsRepository
 import com.nova.music.domain.repository.MusicExtractor
 import com.nova.music.domain.repository.MusicRepository
@@ -127,6 +130,19 @@ val appModule = module {
             playlistDao = get(),
             trackDao = get()
         )
+    }
+
+    // History Repository
+    single<HistoryRepository> {
+        HistoryRepositoryImpl(
+            historyDao = get(),
+            trackDao = get()
+        )
+    }
+
+    // Queue Persistence Repository
+    single {
+        QueuePersistenceRepository(queueDao = get())
     }
 
     // Media3 Data Source Factory with Web Remix headers

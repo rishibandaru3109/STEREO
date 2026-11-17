@@ -2,6 +2,10 @@ package com.nova.music.playback.queue
 
 import com.nova.music.domain.model.RepeatMode
 import com.nova.music.domain.model.Track
+import com.nova.music.playback.shuffle.BalancedShuffle
+import com.nova.music.playback.shuffle.ShuffleEngine
+import com.nova.music.playback.shuffle.ShuffleMode
+import com.nova.music.playback.shuffle.StandardShuffle
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -14,7 +18,8 @@ class QueueManager {
         val originalQueue: List<Track>,
         val activeQueue: List<Track>,
         val currentIndex: Int,
-        val isShuffle: Boolean
+        val isShuffle: Boolean,
+        val shuffleMode: ShuffleMode
     )
 
     private var originalQueue: MutableList<Track> = mutableListOf()
@@ -22,6 +27,7 @@ class QueueManager {
     private var userQueue: MutableList<Track> = mutableListOf()
     private var currentIndex: Int = -1
     private var isShuffle: Boolean = false
+    private var shuffleMode: ShuffleMode = ShuffleMode.OFF
 
     private val undoStack = ArrayDeque<QueueBackup>(10)
 
@@ -37,7 +43,8 @@ class QueueManager {
                 originalQueue = ArrayList(originalQueue),
                 activeQueue = ArrayList(activeQueue),
                 currentIndex = currentIndex,
-                isShuffle = isShuffle
+                isShuffle = isShuffle,
+                shuffleMode = shuffleMode
             )
         )
     }
@@ -50,22 +57,32 @@ class QueueManager {
                 activeQueue = ArrayList(activeQueue),
                 currentIndex = currentIndex,
                 isShuffle = isShuffle,
+                shuffleMode = shuffleMode,
                 userQueueCount = userQueue.size
             )
         }
     }
 
     @Synchronized
-    fun setQueue(tracks: List<Track>, startIndex: Int = 0, isShuffle: Boolean = false) {
+    fun setQueue(
+        tracks: List<Track>,
+        startIndex: Int = 0,
+        isShuffle: Boolean = false,
+        shuffleMode: ShuffleMode = ShuffleMode.STANDARD
+    ) {
         pushUndo()
         originalQueue = tracks.toMutableList()
         this.isShuffle = isShuffle
+        this.shuffleMode = if (isShuffle) shuffleMode else ShuffleMode.OFF
 
         if (isShuffle && tracks.isNotEmpty()) {
             val safeIndex = startIndex.coerceIn(0, tracks.size - 1)
             val selectedTrack = tracks[safeIndex]
-            val remainder = tracks.filterIndexed { index, _ -> index != safeIndex }.shuffled()
-            activeQueue = (listOf(selectedTrack) + remainder).toMutableList()
+            val engine: ShuffleEngine = when (shuffleMode) {
+                ShuffleMode.BALANCED -> BalancedShuffle()
+                else -> StandardShuffle()
+            }
+            activeQueue = engine.shuffle(tracks, selectedTrack).toMutableList()
             currentIndex = 0
         } else {
             activeQueue = tracks.toMutableList()
@@ -95,7 +112,7 @@ class QueueManager {
     fun playNext(track: Track) {
         pushUndo()
         if (activeQueue.isEmpty()) {
-            setQueue(listOf(track), 0, isShuffle)
+            setQueue(listOf(track), 0, isShuffle, shuffleMode)
             return
         }
         val insertIndex = (currentIndex + 1).coerceIn(0, activeQueue.size)
@@ -112,7 +129,7 @@ class QueueManager {
         if (tracks.isEmpty()) return
         pushUndo()
         if (activeQueue.isEmpty()) {
-            setQueue(tracks, 0, isShuffle)
+            setQueue(tracks, 0, isShuffle, shuffleMode)
             return
         }
         val insertIndex = (currentIndex + 1).coerceIn(0, activeQueue.size)
@@ -130,7 +147,7 @@ class QueueManager {
     fun addToQueue(track: Track) {
         pushUndo()
         if (activeQueue.isEmpty()) {
-            setQueue(listOf(track), 0, isShuffle)
+            setQueue(listOf(track), 0, isShuffle, shuffleMode)
             return
         }
         activeQueue.add(track)
@@ -145,7 +162,7 @@ class QueueManager {
         if (tracks.isEmpty()) return
         pushUndo()
         if (activeQueue.isEmpty()) {
-            setQueue(tracks, 0, isShuffle)
+            setQueue(tracks, 0, isShuffle, shuffleMode)
             return
         }
         activeQueue.addAll(tracks)
@@ -271,24 +288,24 @@ class QueueManager {
     @Synchronized
     fun toggleShuffle(
         enable: Boolean,
-        shuffler: ((List<Track>, Track?) -> List<Track>)? = null
+        mode: ShuffleMode = ShuffleMode.STANDARD,
+        seed: Long? = null
     ) {
-        if (isShuffle == enable) return
+        if (isShuffle == enable && (enable && shuffleMode == mode)) return
         pushUndo()
         isShuffle = enable
+        shuffleMode = if (enable) mode else ShuffleMode.OFF
 
         val currentTrack = if (currentIndex in activeQueue.indices) activeQueue[currentIndex] else null
 
         if (enable) {
             if (activeQueue.isNotEmpty()) {
-                val shuffled = if (shuffler != null) {
-                    shuffler(activeQueue, currentTrack)
-                } else {
-                    val remaining = activeQueue.filter { it.id != currentTrack?.id }.shuffled()
-                    if (currentTrack != null) listOf(currentTrack) + remaining else remaining
+                val engine: ShuffleEngine = when (mode) {
+                    ShuffleMode.BALANCED -> BalancedShuffle()
+                    else -> StandardShuffle()
                 }
-                activeQueue = shuffled.toMutableList()
-                currentIndex = if (currentTrack != null) 0 else 0
+                activeQueue = engine.shuffle(activeQueue, currentTrack, seed).toMutableList()
+                currentIndex = 0
             }
         } else {
             // Restore original order and preserve current track pointer
@@ -309,6 +326,7 @@ class QueueManager {
         activeQueue = ArrayList(backup.activeQueue)
         currentIndex = backup.currentIndex
         isShuffle = backup.isShuffle
+        shuffleMode = backup.shuffleMode
         emitState()
         return true
     }
@@ -318,12 +336,14 @@ class QueueManager {
         savedOriginal: List<Track>,
         savedActive: List<Track>,
         savedIndex: Int,
-        savedShuffle: Boolean
+        savedShuffle: Boolean,
+        savedShuffleMode: ShuffleMode = ShuffleMode.OFF
     ) {
         originalQueue = savedOriginal.toMutableList()
         activeQueue = savedActive.toMutableList()
         currentIndex = if (savedActive.isNotEmpty()) savedIndex.coerceIn(0, savedActive.size - 1) else -1
         isShuffle = savedShuffle
+        shuffleMode = savedShuffleMode
         userQueue.clear()
         emitState()
     }
@@ -338,4 +358,6 @@ class QueueManager {
     fun getCurrentIndex(): Int = currentIndex
 
     fun isShuffleEnabled(): Boolean = isShuffle
+
+    fun getShuffleMode(): ShuffleMode = shuffleMode
 }
