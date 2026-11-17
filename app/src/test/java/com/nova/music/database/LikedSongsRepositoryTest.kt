@@ -98,6 +98,10 @@ class FakeLikedSongDao(private val fakeTrackDao: FakeTrackDao) : LikedSongDao {
     override fun getAllLikedTrackIds(): Flow<List<String>> {
         return likesFlow.map { it.keys.toList() }
     }
+
+    override suspend fun getAllLikedTrackIdsList(): List<String> {
+        return likesFlow.value.keys.toList()
+    }
 }
 
 class LikedSongsRepositoryTest {

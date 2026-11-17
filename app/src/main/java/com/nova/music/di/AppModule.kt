@@ -14,23 +14,32 @@ import com.nova.music.core.database.dao.HistoryDao
 import com.nova.music.core.database.dao.LikedSongDao
 import com.nova.music.core.database.dao.PlaylistDao
 import com.nova.music.core.database.dao.QueueDao
+import com.nova.music.core.database.dao.RecommendationDao
 import com.nova.music.core.database.dao.TrackDao
 import com.nova.music.core.designsystem.theme.ThemePreferencesRepository
 import com.nova.music.core.designsystem.theme.ThemeRepository
 import com.nova.music.core.designsystem.wallpaper.WallpaperPreferencesRepository
 import com.nova.music.core.designsystem.wallpaper.WallpaperRepository
 import com.nova.music.data.extractor.InnerTubeXExtractor
-import com.nova.music.data.extractor.YouTubeMusicExtractor
 import com.nova.music.data.repository.HistoryRepositoryImpl
+import com.nova.music.data.repository.HomeRepositoryImpl
 import com.nova.music.data.repository.LikedSongsRepositoryImpl
+import com.nova.music.data.repository.ListeningProfileRepositoryImpl
 import com.nova.music.data.repository.MusicRepositoryImpl
 import com.nova.music.data.repository.PlaylistRepositoryImpl
 import com.nova.music.data.repository.QueuePersistenceRepository
+import com.nova.music.domain.recommendation.CandidateProvider
+import com.nova.music.domain.recommendation.CatalogCandidateProvider
+import com.nova.music.domain.recommendation.RecommendationEngine
+import com.nova.music.domain.recommendation.RecommendationEngineImpl
 import com.nova.music.domain.repository.HistoryRepository
+import com.nova.music.domain.repository.HomeRepository
 import com.nova.music.domain.repository.LikedSongsRepository
+import com.nova.music.domain.repository.ListeningProfileRepository
 import com.nova.music.domain.repository.MusicExtractor
 import com.nova.music.domain.repository.MusicRepository
 import com.nova.music.domain.repository.PlaylistRepository
+import com.nova.music.feature.home.HomeViewModel
 import com.nova.music.feature.library.LibraryViewModel
 import com.nova.music.feature.player.PlayerViewModel
 import com.nova.music.feature.search.SearchViewModel
@@ -103,19 +112,22 @@ val appModule = module {
         MusicRepositoryImpl(extractor = get())
     }
 
-    // Room Database & DAOs
+    // Room Database & DAOs with Migration(1, 2)
     single<StereoDatabase> {
         Room.databaseBuilder(
             androidContext(),
             StereoDatabase::class.java,
             "stereo_database.db"
-        ).build()
+        )
+            .addMigrations(StereoDatabase.MIGRATION_1_2)
+            .build()
     }
     single<TrackDao> { get<StereoDatabase>().trackDao() }
     single<LikedSongDao> { get<StereoDatabase>().likedSongDao() }
     single<PlaylistDao> { get<StereoDatabase>().playlistDao() }
     single<HistoryDao> { get<StereoDatabase>().historyDao() }
     single<QueueDao> { get<StereoDatabase>().queueDao() }
+    single<RecommendationDao> { get<StereoDatabase>().recommendationDao() }
 
     // Liked Songs Repository
     single<LikedSongsRepository> {
@@ -138,6 +150,34 @@ val appModule = module {
         HistoryRepositoryImpl(
             historyDao = get(),
             trackDao = get()
+        )
+    }
+
+    // Listening Profile Repository
+    single<ListeningProfileRepository> {
+        ListeningProfileRepositoryImpl(
+            historyDao = get(),
+            likedSongDao = get(),
+            trackDao = get(),
+            recommendationDao = get()
+        )
+    }
+
+    // Recommendation Engine & Providers
+    single<CandidateProvider> {
+        CatalogCandidateProvider(extractor = get())
+    }
+
+    single<RecommendationEngine> {
+        RecommendationEngineImpl()
+    }
+
+    single<HomeRepository> {
+        HomeRepositoryImpl(
+            listeningProfileRepository = get(),
+            candidateProvider = get(),
+            recommendationEngine = get(),
+            recommendationDao = get()
         )
     }
 
@@ -193,6 +233,14 @@ val appModule = module {
     }
 
     // ViewModels
+    viewModel {
+        HomeViewModel(
+            homeRepository = get(),
+            playerController = get(),
+            likedSongsRepository = get()
+        )
+    }
+
     viewModel {
         SearchViewModel(
             musicRepository = get(),

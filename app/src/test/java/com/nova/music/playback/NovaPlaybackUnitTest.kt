@@ -23,9 +23,27 @@ class FakePlayerController : NovaPlayerController {
     var pauseCalled = false
     var nextCalled = false
     var prevCalled = false
+    var lastQueueSet: List<Track> = emptyList()
+    var lastStartIndex: Int = 0
 
-    override fun playTrack(track: Track) {}
-    override fun setQueue(tracks: List<Track>, startIndex: Int) {}
+    val queue: List<Track> get() = lastQueueSet
+    val currentTrack: Track? get() = state.value.currentTrack
+    val isPlaying: Boolean get() = playCalled || state.value.status == com.nova.music.domain.model.PlayerStatus.PLAYING
+
+    override fun playTrack(track: Track) {
+        setQueue(listOf(track), 0)
+    }
+
+    override fun setQueue(tracks: List<Track>, startIndex: Int) {
+        lastQueueSet = tracks
+        lastStartIndex = startIndex
+        if (tracks.isNotEmpty() && startIndex in tracks.indices) {
+            state.value = state.value.copy(
+                currentTrack = tracks[startIndex],
+                status = com.nova.music.domain.model.PlayerStatus.PLAYING
+            )
+        }
+    }
     override fun playNext(track: Track) {}
     override fun addToQueue(track: Track) {}
     override fun removeFromQueue(index: Int) {}

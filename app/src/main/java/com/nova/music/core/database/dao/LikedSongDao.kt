@@ -57,4 +57,7 @@ interface LikedSongDao {
 
     @Query("SELECT trackId FROM liked_songs")
     fun getAllLikedTrackIds(): Flow<List<String>>
+
+    @Query("SELECT trackId FROM liked_songs")
+    suspend fun getAllLikedTrackIdsList(): List<String>
 }

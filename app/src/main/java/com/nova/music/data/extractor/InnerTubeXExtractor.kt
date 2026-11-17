@@ -21,6 +21,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
+import okhttp3.Request
 import org.json.JSONObject
 import java.net.URI
 
@@ -119,11 +120,14 @@ class InnerTubeXExtractor(
 
         val rawUrl = extracted?.audioUrl ?: ""
         val isValidDirectUrl = (rawUrl.startsWith("http://") || rawUrl.startsWith("https://")) && rawUrl.contains("googlevideo.com")
+        val isVerified = if (extracted != null && isValidDirectUrl) {
+            verifyStreamPlayable(rawUrl, extracted.headers)
+        } else false
 
-        if (extracted != null && isValidDirectUrl) {
+        if (extracted != null && isValidDirectUrl && isVerified) {
             val elapsed = System.currentTimeMillis() - startTime
             val host = runCatching { URI(rawUrl).host }.getOrDefault("unknown")
-            logI("InnerTubeX stream resolved in ${elapsed}ms: host=$host, itag=${extracted.itag}, client=${extracted.clientName}, mime=${extracted.mimeType}")
+            logI("InnerTubeX stream resolved and verified in ${elapsed}ms: host=$host, itag=${extracted.itag}, client=${extracted.clientName}, mime=${extracted.mimeType}")
 
             Result.success(
                 AudioStream(
@@ -139,7 +143,7 @@ class InnerTubeXExtractor(
             )
         } else {
             val elapsed = System.currentTimeMillis() - startTime
-            logI("InnerTubeX returned non-direct or invalid URL ('${rawUrl.take(60)}') in ${elapsed}ms. Seamlessly falling back to YouTubeMusicExtractor for track: $trackId")
+            logI("InnerTubeX returned unverified or non-playable URL in ${elapsed}ms. Seamlessly falling back to YouTubeMusicExtractor for track: $trackId")
             val fallbackResult = fallbackExtractor.resolveAudioStream(trackId)
             if (fallbackResult.isSuccess) {
                 val totalElapsed = System.currentTimeMillis() - startTime
@@ -148,6 +152,20 @@ class InnerTubeXExtractor(
                 logE("Fallback resolution failed for track '$trackId': ${fallbackResult.exceptionOrNull()?.message}", fallbackResult.exceptionOrNull())
             }
             fallbackResult
+        }
+    }
+
+    private fun verifyStreamPlayable(url: String, headers: Map<String, String>): Boolean {
+        return try {
+            val reqBuilder = Request.Builder()
+                .url(url)
+                .addHeader("Range", "bytes=0-1024")
+            headers.forEach { (k, v) -> reqBuilder.addHeader(k, v) }
+            okHttpClient.newCall(reqBuilder.build()).execute().use { response ->
+                response.isSuccessful || response.code == 206
+            }
+        } catch (_: Exception) {
+            false
         }
     }
 

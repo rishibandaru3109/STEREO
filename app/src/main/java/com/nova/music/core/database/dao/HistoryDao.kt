@@ -35,6 +35,12 @@ interface HistoryDao {
     """)
     fun getFullHistory(limit: Int = 100): Flow<List<TrackEntity>>
 
+    @Query("SELECT * FROM listening_history ORDER BY playedAt DESC LIMIT :limit")
+    fun getRawHistory(limit: Int = 200): Flow<List<ListeningHistoryEntity>>
+
+    @Query("SELECT * FROM listening_history ORDER BY playedAt DESC LIMIT :limit")
+    suspend fun getRawHistoryList(limit: Int = 200): List<ListeningHistoryEntity>
+
     @Query("DELETE FROM listening_history WHERE trackId = :trackId")
     suspend fun removeHistoryForTrack(trackId: String)
 

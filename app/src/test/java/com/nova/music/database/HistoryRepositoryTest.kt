@@ -44,6 +44,14 @@ class FakeHistoryDao(private val fakeTrackDao: FakeTrackDao) : HistoryDao {
         }
     }
 
+    override fun getRawHistory(limit: Int): Flow<List<ListeningHistoryEntity>> {
+        return historyEvents.map { it.sortedByDescending { e -> e.playedAt }.take(limit) }
+    }
+
+    override suspend fun getRawHistoryList(limit: Int): List<ListeningHistoryEntity> {
+        return historyEvents.value.sortedByDescending { it.playedAt }.take(limit)
+    }
+
     override suspend fun removeHistoryForTrack(trackId: String) {
         historyEvents.value = historyEvents.value.filter { it.trackId != trackId }
     }
