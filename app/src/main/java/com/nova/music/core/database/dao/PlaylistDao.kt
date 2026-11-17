@@ -11,6 +11,18 @@ import com.nova.music.core.database.entity.PlaylistEntryEntity
 import com.nova.music.core.database.entity.TrackEntity
 import kotlinx.coroutines.flow.Flow
 
+data class PlaylistWithMetadata(
+    val id: String,
+    val name: String,
+    val description: String?,
+    val coverArtworkUrl: String?,
+    val createdAt: Long,
+    val updatedAt: Long,
+    val isPinned: Boolean,
+    val trackCount: Int,
+    val autoArtworkUrl: String?
+)
+
 @Dao
 interface PlaylistDao {
 
@@ -25,6 +37,15 @@ interface PlaylistDao {
 
     @Query("SELECT * FROM playlists ORDER BY isPinned DESC, updatedAt DESC")
     fun getPlaylists(): Flow<List<PlaylistEntity>>
+
+    @Query("""
+        SELECT p.id, p.name, p.description, p.coverArtworkUrl, p.createdAt, p.updatedAt, p.isPinned,
+               (SELECT COUNT(*) FROM playlist_entries pe WHERE pe.playlistId = p.id) as trackCount,
+               (SELECT t.thumbnailUrl FROM playlist_entries pe INNER JOIN tracks t ON pe.trackId = t.id WHERE pe.playlistId = p.id ORDER BY pe.position ASC LIMIT 1) as autoArtworkUrl
+        FROM playlists p
+        ORDER BY p.isPinned DESC, p.updatedAt DESC
+    """)
+    fun getPlaylistsWithMetadata(): Flow<List<PlaylistWithMetadata>>
 
     @Query("SELECT * FROM playlists WHERE id = :id")
     suspend fun getPlaylistById(id: String): PlaylistEntity?
@@ -63,6 +84,9 @@ interface PlaylistDao {
 
     @Query("SELECT COUNT(*) FROM playlist_entries WHERE playlistId = :playlistId")
     fun getPlaylistTrackCount(playlistId: String): Flow<Int>
+
+    @Query("UPDATE playlists SET name = :name, updatedAt = :timestamp WHERE id = :playlistId")
+    suspend fun renamePlaylist(playlistId: String, name: String, timestamp: Long = System.currentTimeMillis())
 
     @Transaction
     suspend fun reorderEntries(playlistId: String, orderedEntryIds: List<Long>) {

@@ -23,9 +23,11 @@ import com.nova.music.data.extractor.InnerTubeXExtractor
 import com.nova.music.data.extractor.YouTubeMusicExtractor
 import com.nova.music.data.repository.LikedSongsRepositoryImpl
 import com.nova.music.data.repository.MusicRepositoryImpl
+import com.nova.music.data.repository.PlaylistRepositoryImpl
 import com.nova.music.domain.repository.LikedSongsRepository
 import com.nova.music.domain.repository.MusicExtractor
 import com.nova.music.domain.repository.MusicRepository
+import com.nova.music.domain.repository.PlaylistRepository
 import com.nova.music.feature.player.PlayerViewModel
 import com.nova.music.feature.search.SearchViewModel
 import com.nova.music.feature.theme.ThemeViewModel
@@ -115,6 +117,14 @@ val appModule = module {
         LikedSongsRepositoryImpl(
             trackDao = get(),
             likedSongDao = get()
+        )
+    }
+
+    // Playlist Repository
+    single<PlaylistRepository> {
+        PlaylistRepositoryImpl(
+            playlistDao = get(),
+            trackDao = get()
         )
     }
 
