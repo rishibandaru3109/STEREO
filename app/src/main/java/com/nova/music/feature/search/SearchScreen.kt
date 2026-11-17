@@ -26,6 +26,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Search
@@ -56,6 +57,7 @@ import com.nova.music.domain.model.Track
 @Composable
 fun SearchScreen(
     viewModel: SearchViewModel,
+    onOpenLibrary: () -> Unit = {},
     onOpenThemeGallery: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
@@ -104,6 +106,23 @@ fun SearchScreen(
             Spacer(modifier = Modifier.weight(1f))
 
             IconButton(
+                onClick = onOpenLibrary,
+                modifier = Modifier
+                    .clip(CircleShape)
+                    .background(colors.surfaceElevated)
+                    .size(40.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.LibraryMusic,
+                    contentDescription = "Library",
+                    tint = colors.primaryAccent,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            IconButton(
                 onClick = onOpenThemeGallery,
                 modifier = Modifier
                     .clip(CircleShape)
@@ -113,7 +132,7 @@ fun SearchScreen(
                 Icon(
                     imageVector = Icons.Default.Palette,
                     contentDescription = "Theme Gallery",
-                    tint = colors.primaryAccent,
+                    tint = colors.textSecondary,
                     modifier = Modifier.size(20.dp)
                 )
             }

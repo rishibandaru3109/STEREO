@@ -31,6 +31,7 @@ import com.nova.music.domain.repository.LikedSongsRepository
 import com.nova.music.domain.repository.MusicExtractor
 import com.nova.music.domain.repository.MusicRepository
 import com.nova.music.domain.repository.PlaylistRepository
+import com.nova.music.feature.library.LibraryViewModel
 import com.nova.music.feature.player.PlayerViewModel
 import com.nova.music.feature.search.SearchViewModel
 import com.nova.music.feature.theme.ThemeViewModel
@@ -201,6 +202,16 @@ val appModule = module {
 
     viewModel {
         PlayerViewModel(
+            playerController = get(),
+            likedSongsRepository = get()
+        )
+    }
+
+    viewModel {
+        LibraryViewModel(
+            likedSongsRepository = get(),
+            playlistRepository = get(),
+            historyRepository = get(),
             playerController = get()
         )
     }

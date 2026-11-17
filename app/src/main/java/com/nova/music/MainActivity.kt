@@ -28,6 +28,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nova.music.core.designsystem.theme.StereoTheme
 import com.nova.music.core.designsystem.wallpaper.WallpaperBackdrop
 import com.nova.music.core.designsystem.wallpaper.WallpaperConfig
+import com.nova.music.feature.library.LibraryScreen
+import com.nova.music.feature.library.LibraryViewModel
+import com.nova.music.feature.library.LikedSongsScreen
+import com.nova.music.feature.library.PlaylistDetailScreen
 import com.nova.music.feature.player.FullPlayerSheet
 import com.nova.music.feature.player.MiniPlayer
 import com.nova.music.feature.player.PlayerViewModel
@@ -42,6 +46,9 @@ import org.koin.androidx.compose.koinViewModel
 
 enum class MainScreen {
     SEARCH,
+    LIBRARY,
+    LIKED_SONGS,
+    PLAYLIST_DETAILS,
     THEMES,
     THEME_STUDIO,
     WALLPAPER_STUDIO
@@ -80,6 +87,7 @@ fun StereoApp() {
     StereoTheme(colors = currentColors) {
         val searchViewModel: SearchViewModel = koinViewModel()
         val playerViewModel: PlayerViewModel = koinViewModel()
+        val libraryViewModel: LibraryViewModel = koinViewModel()
         val playbackState by playerViewModel.playbackState.collectAsStateWithLifecycle()
         var currentScreen by remember { mutableStateOf(MainScreen.SEARCH) }
         var isFullPlayerExpanded by remember { mutableStateOf(false) }
@@ -87,6 +95,7 @@ fun StereoApp() {
         BackHandler(enabled = currentScreen != MainScreen.SEARCH) {
             currentScreen = when (currentScreen) {
                 MainScreen.THEME_STUDIO, MainScreen.WALLPAPER_STUDIO -> MainScreen.THEMES
+                MainScreen.LIKED_SONGS, MainScreen.PLAYLIST_DETAILS -> MainScreen.LIBRARY
                 else -> MainScreen.SEARCH
             }
         }
@@ -117,7 +126,35 @@ fun StereoApp() {
                         MainScreen.SEARCH -> {
                             SearchScreen(
                                 viewModel = searchViewModel,
+                                onOpenLibrary = { currentScreen = MainScreen.LIBRARY },
                                 onOpenThemeGallery = { currentScreen = MainScreen.THEMES },
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
+                        MainScreen.LIBRARY -> {
+                            LibraryScreen(
+                                viewModel = libraryViewModel,
+                                onOpenLikedSongs = { currentScreen = MainScreen.LIKED_SONGS },
+                                onOpenPlaylist = { playlistId ->
+                                    libraryViewModel.selectPlaylist(playlistId)
+                                    currentScreen = MainScreen.PLAYLIST_DETAILS
+                                },
+                                onOpenSearch = { currentScreen = MainScreen.SEARCH },
+                                onOpenThemeGallery = { currentScreen = MainScreen.THEMES },
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
+                        MainScreen.LIKED_SONGS -> {
+                            LikedSongsScreen(
+                                viewModel = libraryViewModel,
+                                onBackClick = { currentScreen = MainScreen.LIBRARY },
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
+                        MainScreen.PLAYLIST_DETAILS -> {
+                            PlaylistDetailScreen(
+                                viewModel = libraryViewModel,
+                                onBackClick = { currentScreen = MainScreen.LIBRARY },
                                 modifier = Modifier.fillMaxSize()
                             )
                         }

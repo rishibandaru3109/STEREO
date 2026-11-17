@@ -16,6 +16,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
@@ -49,6 +51,8 @@ fun MiniPlayer(
     val state by viewModel.playbackState.collectAsStateWithLifecycle()
     val track = state.currentTrack ?: return
     val colors = StereoTheme.colors
+    val likedTrackIds by viewModel.likedTrackIds.collectAsStateWithLifecycle()
+    val isLiked = likedTrackIds.contains(track.id)
 
     Box(
         modifier = modifier
@@ -127,7 +131,22 @@ fun MiniPlayer(
                     )
                 }
 
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(4.dp))
+
+                // Like Button
+                IconButton(
+                    onClick = { viewModel.toggleLike(track) },
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(
+                        imageVector = if (isLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                        contentDescription = if (isLiked) "Unlike" else "Like",
+                        tint = if (isLiked) colors.primaryAccent else colors.controlInactive,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(4.dp))
 
                 // Play / Pause Button with tactile circular touch target
                 Box(

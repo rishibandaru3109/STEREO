@@ -18,10 +18,13 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.QueueMusic
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.RepeatOne
 import androidx.compose.material.icons.filled.Shuffle
@@ -74,6 +77,7 @@ fun FullPlayerSheet(
     val colors = StereoTheme.colors
     val wallpaperViewModel: WallpaperViewModel = koinViewModel()
     val wallpaperConfig by wallpaperViewModel.wallpaperConfig.collectAsStateWithLifecycle()
+    var isQueueSheetOpen by remember { mutableStateOf(false) }
 
     ModalBottomSheet(
         onDismissRequest = onDismissRequest,
@@ -129,7 +133,14 @@ fun FullPlayerSheet(
                 }
 
                 Spacer(modifier = Modifier.weight(1f))
-                Spacer(modifier = Modifier.width(48.dp)) // balance balance
+                IconButton(onClick = { isQueueSheetOpen = true }) {
+                    Icon(
+                        imageVector = Icons.Default.QueueMusic,
+                        contentDescription = "Queue",
+                        tint = colors.textPrimary,
+                        modifier = Modifier.size(26.dp)
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -163,29 +174,44 @@ fun FullPlayerSheet(
 
             Spacer(modifier = Modifier.height(28.dp))
 
-            // Track Title & Artist
-            Column(
+            // Track Title, Artist & Like Button
+            Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalAlignment = Alignment.Start
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = track.title,
-                    style = MaterialTheme.typography.headlineMedium.copy(
-                        fontWeight = FontWeight.Bold,
-                        color = colors.textPrimary
-                    ),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = track.artist + (track.album?.let { " • $it" } ?: ""),
-                    style = MaterialTheme.typography.titleMedium.copy(
-                        color = colors.textSecondary
-                    ),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = track.title,
+                        style = MaterialTheme.typography.headlineMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                            color = colors.textPrimary
+                        ),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = track.artist + (track.album?.let { " • $it" } ?: ""),
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            color = colors.textSecondary
+                        ),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+
+                val likedTrackIds by viewModel.likedTrackIds.collectAsStateWithLifecycle()
+                val isLiked = likedTrackIds.contains(track.id)
+
+                IconButton(onClick = { viewModel.toggleLike(track) }) {
+                    Icon(
+                        imageVector = if (isLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                        contentDescription = if (isLiked) "Unlike" else "Like",
+                        tint = if (isLiked) colors.primaryAccent else colors.controlInactive,
+                        modifier = Modifier.size(28.dp)
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(20.dp))
@@ -328,6 +354,13 @@ fun FullPlayerSheet(
                 )
             }
         }
+    }
+
+    if (isQueueSheetOpen) {
+        QueueSheet(
+            viewModel = viewModel,
+            onDismissRequest = { isQueueSheetOpen = false }
+        )
     }
 }
 }
