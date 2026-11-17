@@ -4,8 +4,6 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.util.Log
-import androidx.media3.common.AudioAttributes
-import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.PlaybackException
@@ -21,6 +19,8 @@ import com.nova.music.domain.model.PlayerStatus
 import com.nova.music.domain.model.RepeatMode
 import com.nova.music.domain.model.Track
 import com.nova.music.domain.repository.MusicRepository
+import com.nova.music.playback.queue.QueueManager
+import com.nova.music.playback.queue.QueueSnapshot
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -36,7 +36,8 @@ import java.io.IOException
 class ExoPlayerController(
     private val context: Context,
     private val musicRepository: MusicRepository,
-    private val exoPlayer: ExoPlayer
+    private val exoPlayer: ExoPlayer,
+    private val queueManager: QueueManager = QueueManager()
 ) : NovaPlayerController {
 
     private val scope = CoroutineScope(Dispatchers.Main + Job())
@@ -44,6 +45,7 @@ class ExoPlayerController(
 
     private val _playbackState = MutableStateFlow(PlaybackState())
     override val playbackState: StateFlow<PlaybackState> = _playbackState.asStateFlow()
+    override val queueSnapshot: StateFlow<QueueSnapshot> = queueManager.snapshot
 
     private val playerListener = object : Player.Listener {
         override fun onPlaybackStateChanged(playbackState: Int) {
@@ -139,6 +141,20 @@ class ExoPlayerController(
                 Log.e("NOVA_DIAGNOSTICS", "ExoPlayer load error: host=$host, error=${error.javaClass.simpleName}: ${error.message}, server=$server, xGvs=$xGvs, wasCanceled=$wasCanceled")
             }
         })
+
+        // Synchronize QueueManager snapshot with PlaybackState
+        scope.launch {
+            queueManager.snapshot.collect { snapshot ->
+                _playbackState.update { current ->
+                    current.copy(
+                        currentTrack = snapshot.currentTrack,
+                        queue = snapshot.activeQueue,
+                        queueIndex = snapshot.currentIndex,
+                        isShuffle = snapshot.isShuffle
+                    )
+                }
+            }
+        }
     }
 
     private fun ensureServiceStarted() {
@@ -152,43 +168,61 @@ class ExoPlayerController(
 
     override fun playTrack(track: Track) {
         ensureServiceStarted()
-        val currentQueue = _playbackState.value.queue
-        val existingIndex = currentQueue.indexOfFirst { it.id == track.id }
-        val newQueue = if (existingIndex >= 0) currentQueue else currentQueue + track
-        val newIndex = if (existingIndex >= 0) existingIndex else newQueue.size - 1
-
         _playbackState.update {
             it.copy(
-                currentTrack = track,
-                queue = newQueue,
-                queueIndex = newIndex,
                 status = PlayerStatus.BUFFERING,
                 errorMessage = null,
                 currentPositionMs = 0L
             )
         }
-
-        resolveAndPlay(track)
+        val target = queueManager.playNow(track)
+        resolveAndPlay(target)
     }
 
     override fun setQueue(tracks: List<Track>, startIndex: Int) {
         if (tracks.isEmpty()) return
         ensureServiceStarted()
-        val validIndex = startIndex.coerceIn(0, tracks.size - 1)
-        val track = tracks[validIndex]
-
         _playbackState.update {
             it.copy(
-                queue = tracks,
-                queueIndex = validIndex,
-                currentTrack = track,
                 status = PlayerStatus.BUFFERING,
                 errorMessage = null,
                 currentPositionMs = 0L
             )
         }
+        queueManager.setQueue(tracks, startIndex, isShuffle = _playbackState.value.isShuffle)
+        queueManager.getCurrentTrack()?.let { resolveAndPlay(it) }
+    }
 
-        resolveAndPlay(track)
+    override fun playNext(track: Track) {
+        queueManager.playNext(track)
+    }
+
+    override fun addToQueue(track: Track) {
+        queueManager.addToQueue(track)
+    }
+
+    override fun removeFromQueue(index: Int) {
+        queueManager.removeFromQueue(index)
+    }
+
+    override fun moveTrack(fromIndex: Int, toIndex: Int) {
+        queueManager.moveTrack(fromIndex, toIndex)
+    }
+
+    override fun jumpToQueueIndex(index: Int) {
+        val track = queueManager.jumpToIndex(index)
+        if (track != null) {
+            ensureServiceStarted()
+            resolveAndPlay(track)
+        }
+    }
+
+    override fun clearUpcoming() {
+        queueManager.clearUpcoming()
+    }
+
+    override fun undoQueueChange(): Boolean {
+        return queueManager.undo()
     }
 
     private fun resolveAndPlay(track: Track) {
@@ -267,26 +301,21 @@ class ExoPlayerController(
     }
 
     override fun next() {
-        val state = _playbackState.value
-        if (state.queue.isEmpty()) return
-        val nextIndex = (state.queueIndex + 1) % state.queue.size
-        val nextTrack = state.queue[nextIndex]
-        _playbackState.update { it.copy(queueIndex = nextIndex, currentTrack = nextTrack) }
-        resolveAndPlay(nextTrack)
+        val nextTrack = queueManager.next(_playbackState.value.repeatMode)
+        if (nextTrack != null) {
+            resolveAndPlay(nextTrack)
+        }
     }
 
     override fun previous() {
-        val state = _playbackState.value
-        if (state.queue.isEmpty()) return
-        // If current position > 3 seconds, replay current song
         if (exoPlayer.currentPosition > 3000) {
             seekTo(0)
             return
         }
-        val prevIndex = if (state.queueIndex > 0) state.queueIndex - 1 else state.queue.size - 1
-        val prevTrack = state.queue[prevIndex]
-        _playbackState.update { it.copy(queueIndex = prevIndex, currentTrack = prevTrack) }
-        resolveAndPlay(prevTrack)
+        val prevTrack = queueManager.previous(_playbackState.value.repeatMode)
+        if (prevTrack != null) {
+            resolveAndPlay(prevTrack)
+        }
     }
 
     override fun setRepeatMode(repeatMode: RepeatMode) {
@@ -300,8 +329,7 @@ class ExoPlayerController(
 
     override fun toggleShuffle() {
         val newShuffle = !_playbackState.value.isShuffle
-        _playbackState.update { it.copy(isShuffle = newShuffle) }
-        exoPlayer.shuffleModeEnabled = newShuffle
+        queueManager.toggleShuffle(newShuffle)
     }
 
     private fun handleTrackEnded() {
@@ -311,12 +339,12 @@ class ExoPlayerController(
                 seekTo(0)
                 play()
             }
-            RepeatMode.ALL -> {
-                next()
-            }
-            RepeatMode.OFF -> {
-                if (state.queueIndex < state.queue.size - 1) {
-                    next()
+            RepeatMode.ALL, RepeatMode.OFF -> {
+                val nextTrack = queueManager.next(state.repeatMode)
+                if (nextTrack != null) {
+                    resolveAndPlay(nextTrack)
+                } else {
+                    _playbackState.update { it.copy(isPlaying = false, status = PlayerStatus.ENDED) }
                 }
             }
         }

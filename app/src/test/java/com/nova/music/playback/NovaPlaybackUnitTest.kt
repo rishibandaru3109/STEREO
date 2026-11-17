@@ -4,6 +4,7 @@ import androidx.media3.common.Player
 import com.nova.music.domain.model.PlaybackState
 import com.nova.music.domain.model.RepeatMode
 import com.nova.music.domain.model.Track
+import com.nova.music.playback.queue.QueueSnapshot
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import org.junit.Assert.assertFalse
@@ -15,6 +16,9 @@ class FakePlayerController : NovaPlayerController {
     val state = MutableStateFlow(PlaybackState())
     override val playbackState: StateFlow<PlaybackState> = state
 
+    val qSnapshot = MutableStateFlow(QueueSnapshot())
+    override val queueSnapshot: StateFlow<QueueSnapshot> = qSnapshot
+
     var playCalled = false
     var pauseCalled = false
     var nextCalled = false
@@ -22,6 +26,13 @@ class FakePlayerController : NovaPlayerController {
 
     override fun playTrack(track: Track) {}
     override fun setQueue(tracks: List<Track>, startIndex: Int) {}
+    override fun playNext(track: Track) {}
+    override fun addToQueue(track: Track) {}
+    override fun removeFromQueue(index: Int) {}
+    override fun moveTrack(fromIndex: Int, toIndex: Int) {}
+    override fun jumpToQueueIndex(index: Int) {}
+    override fun clearUpcoming() {}
+    override fun undoQueueChange(): Boolean = false
     override fun play() { playCalled = true }
     override fun pause() { pauseCalled = true }
     override fun togglePlayPause() {}

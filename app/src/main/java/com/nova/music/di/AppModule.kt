@@ -34,6 +34,7 @@ import com.nova.music.feature.theme.ThemeViewModel
 import com.nova.music.feature.wallpaper.WallpaperViewModel
 import com.nova.music.playback.ExoPlayerController
 import com.nova.music.playback.NovaPlayerController
+import com.nova.music.playback.queue.QueueManager
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
@@ -161,12 +162,16 @@ val appModule = module {
             .build()
     }
 
+    // Queue Manager Engine
+    single { QueueManager() }
+
     // Playback Controller
     single<NovaPlayerController> {
         ExoPlayerController(
             context = androidContext(),
             musicRepository = get(),
-            exoPlayer = get()
+            exoPlayer = get(),
+            queueManager = get()
         )
     }
 
