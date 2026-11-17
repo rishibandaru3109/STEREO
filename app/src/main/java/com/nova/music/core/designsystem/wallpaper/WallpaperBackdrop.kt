@@ -42,7 +42,6 @@ fun WallpaperBackdrop(
             }
 
             WallpaperMode.ALBUM_ART -> {
-                // Base background in case image is loading or missing
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -65,7 +64,36 @@ fun WallpaperBackdrop(
                     )
                 }
 
-                // Dimming Scrim Overlay
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = config.dimmingAlpha))
+                )
+            }
+
+            WallpaperMode.CUSTOM_IMAGE -> {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(colors.background)
+                )
+
+                if (!config.customImageUri.isNullOrBlank()) {
+                    AsyncImage(
+                        model = config.customImageUri,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .blur(config.blurRadius.dp),
+                        colorFilter = if (config.isDesaturated) {
+                            ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(0f) })
+                        } else {
+                            null
+                        }
+                    )
+                }
+
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -74,7 +102,6 @@ fun WallpaperBackdrop(
             }
         }
 
-        // Foreground Screen Content
         content()
     }
 }

@@ -59,6 +59,7 @@ fun SearchScreen(
     viewModel: SearchViewModel,
     onOpenLibrary: () -> Unit = {},
     onOpenThemeGallery: () -> Unit = {},
+    onOpenSettings: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -69,74 +70,20 @@ fun SearchScreen(
         modifier = modifier
             .fillMaxSize()
             .background(colors.background)
-            .padding(horizontal = 16.dp)
     ) {
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(8.dp))
 
-        // STEREO Brand Header
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "STEREO",
-                style = MaterialTheme.typography.displayLarge.copy(
-                    fontWeight = FontWeight.Black,
-                    letterSpacing = 4.sp,
-                    color = colors.primaryAccent
-                )
-            )
-            Spacer(modifier = Modifier.width(10.dp))
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(colors.surfaceElevated)
-                    .padding(horizontal = 8.dp, vertical = 4.dp)
-            ) {
-                Text(
-                    text = "HI-FI AUDIO",
-                    style = MaterialTheme.typography.labelSmall.copy(
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.5.sp,
-                        color = colors.secondaryAccent
-                    )
-                )
-            }
+        // Compact Brand Header (Phase A1 & B2)
+        com.nova.music.feature.navigation.StereoTopHeader(
+            title = "Search",
+            subtitle = "STEREO CATALOG",
+            onOpenSettings = onOpenSettings,
+            onOpenThemeGallery = onOpenThemeGallery
+        )
 
-            Spacer(modifier = Modifier.weight(1f))
+        Spacer(modifier = Modifier.height(12.dp))
 
-            IconButton(
-                onClick = onOpenLibrary,
-                modifier = Modifier
-                    .clip(CircleShape)
-                    .background(colors.surfaceElevated)
-                    .size(40.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.LibraryMusic,
-                    contentDescription = "Library",
-                    tint = colors.primaryAccent,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-
-            Spacer(modifier = Modifier.width(8.dp))
-
-            IconButton(
-                onClick = onOpenThemeGallery,
-                modifier = Modifier
-                    .clip(CircleShape)
-                    .background(colors.surfaceElevated)
-                    .size(40.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Palette,
-                    contentDescription = "Theme Gallery",
-                    tint = colors.textSecondary,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-        }
+        Column(modifier = Modifier.padding(horizontal = 16.dp)) {
 
         Spacer(modifier = Modifier.height(16.dp))
 
@@ -272,6 +219,7 @@ fun SearchScreen(
             }
         }
     }
+}
 }
 
 @Composable

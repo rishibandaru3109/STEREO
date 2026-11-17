@@ -25,10 +25,12 @@ class RecommendationEngineImpl : RecommendationEngine {
         val validCandidates = candidates.filter { !excludedTrackIds.contains(it.id) }
         val knownTrackIds = (profile.recentTracks.map { it.id } + profile.likedTrackIds).toSet()
 
+        // Strict cross-section deduplication registry
+        val consumedTrackIds = mutableSetOf<String>()
         val sections = mutableListOf<RecommendationSection>()
 
         // 1. QUICK PICKS (blends top known tracks + top scoring new candidates)
-        val quickPicks = generateQuickPicks(profile, validCandidates)
+        val quickPicks = generateQuickPicks(profile, validCandidates, consumedTrackIds)
         if (quickPicks.isNotEmpty()) {
             sections.add(
                 RecommendationSection(
@@ -40,117 +42,91 @@ class RecommendationEngineImpl : RecommendationEngine {
             )
         }
 
-        // 2. RECENTLY PLAYED (pure listening history, if available)
-        if (profile.recentTracks.isNotEmpty()) {
-            sections.add(
-                RecommendationSection(
-                    type = SectionType.RECENTLY_PLAYED,
-                    title = "Recently Played",
-                    subtitle = "Jump back in",
-                    tracks = profile.recentTracks.filter { !excludedTrackIds.contains(it.id) }.take(15)
-                )
-            )
-        }
-
-        // 3. MADE FOR YOU (Algorithmic mixes with multi-artist clustering and artwork mosaics)
-        val mixes = generateMadeForYouMixes(profile, validCandidates)
+        // 2. DAILY MIX (Phase B1: Horizontally scrollable mix cards based on user preferences)
+        val mixes = generateDailyMixes(profile, validCandidates, consumedTrackIds)
         if (mixes.isNotEmpty()) {
             sections.add(
                 RecommendationSection(
                     type = SectionType.MADE_FOR_YOU,
-                    title = "Made For You",
+                    title = "Daily Mix",
                     subtitle = "Personalized mixes tailored to your vibe",
                     mixes = mixes
                 )
             )
         }
 
-        // 4. ON REPEAT (Songs played repeatedly with high completion)
-        val onRepeatTracks = generateOnRepeat(profile, validCandidates)
-        if (onRepeatTracks.isNotEmpty()) {
-            sections.add(
-                RecommendationSection(
-                    type = SectionType.ON_REPEAT,
-                    title = "On Repeat",
-                    subtitle = "Your current heavy rotation",
-                    tracks = onRepeatTracks
+        // 3. RECENT (Phase B1: Actual listening history, quick access)
+        if (profile.recentTracks.isNotEmpty()) {
+            val recentList = profile.recentTracks
+                .filter { !excludedTrackIds.contains(it.id) }
+                .take(15)
+            if (recentList.isNotEmpty()) {
+                sections.add(
+                    RecommendationSection(
+                        type = SectionType.RECENTLY_PLAYED,
+                        title = "Recent",
+                        subtitle = "Jump back in",
+                        tracks = recentList
+                    )
                 )
-            )
+            }
         }
 
-        // 5. DISCOVER WEEKLY (Fresh tracks user has never played before)
-        val discoverTracks = generateDiscoverWeekly(profile, validCandidates, knownTrackIds)
+        // 4. WEEKLY DISCOVER (Phase B1: Fresh discovery music, strictly excludes Daily Mix and History)
+        val discoverTracks = generateWeeklyDiscover(validCandidates, knownTrackIds, consumedTrackIds)
         if (discoverTracks.isNotEmpty()) {
             sections.add(
                 RecommendationSection(
                     type = SectionType.DISCOVER_WEEKLY,
-                    title = "Discover Weekly",
+                    title = "Weekly Discover",
                     subtitle = "Fresh music you haven't heard yet",
                     tracks = discoverTracks
                 )
             )
         }
 
-        // 6. BECAUSE YOU LISTENED TO [ARTIST]
-        if (profile.topArtists.isNotEmpty()) {
-            val topArtist = profile.topArtists.first().artistName
-            val becauseTracks = validCandidates
-                .filter { it.artist.contains(topArtist, ignoreCase = true) }
-                .take(12)
-            if (becauseTracks.isNotEmpty()) {
-                sections.add(
-                    RecommendationSection(
-                        type = SectionType.BECAUSE_YOU_LISTENED,
-                        title = "Because You Listened To $topArtist",
-                        subtitle = "More tracks from and inspired by your top artist",
-                        tracks = becauseTracks
-                    )
-                )
-            }
-        }
+        // 5. FURTHER RECOMMENDATIONS (Phase B1: Distinct related music, strictly deduplicated)
+        val furtherSections = generateFurtherRecommendations(profile, validCandidates, consumedTrackIds)
+        sections.addAll(furtherSections)
 
         return sections
     }
 
-    private fun generateQuickPicks(profile: ListeningProfile, candidates: List<Track>): List<Track> {
-        val scoredList = mutableListOf<Pair<Track, Double>>()
+    private fun generateQuickPicks(
+        profile: ListeningProfile,
+        candidates: List<Track>,
+        consumedTrackIds: MutableSet<String>
+    ): List<Track> {
+        val picks = mutableListOf<Track>()
 
-        val artistScoreMap = profile.topArtists.associate { it.artistName.lowercase() to it.score }
-
-        // Score candidates
-        for (track in candidates) {
-            var score = 1.0
-            val artistScore = artistScoreMap[track.artist.lowercase()] ?: 0.0
-            score += artistScore * 1.5
-
-            if (profile.likedTrackIds.contains(track.id)) {
-                score += 3.0
-            }
-            scoredList.add(track to score)
+        if (!profile.isColdStart) {
+            val topTrackMap = profile.topTracks.associateBy { it.trackId }
+            val known = profile.recentTracks.filter { topTrackMap.containsKey(it.id) }
+            picks.addAll(known.take(3))
         }
 
-        // Add recent top tracks
-        for (track in profile.recentTracks.take(10)) {
-            val artistScore = artistScoreMap[track.artist.lowercase()] ?: 0.0
-            val score = 2.5 + artistScore
-            if (scoredList.none { it.first.id == track.id }) {
-                scoredList.add(track to score)
-            }
-        }
+        val needed = (6 - picks.size).coerceAtLeast(2)
+        val available = candidates.filter { it.id !in consumedTrackIds && !picks.any { p -> p.id == it.id } }
+        picks.addAll(available.take(needed))
 
-        val sorted = scoredList.sortedByDescending { it.second }.map { it.first }
-        return diversifyTracks(sorted, maxConsecutivePerArtist = 2).take(16)
+        val result = diversifyTracks(picks, maxConsecutivePerArtist = 2)
+        consumedTrackIds.addAll(result.map { it.id })
+        return result
     }
 
-    private fun generateMadeForYouMixes(profile: ListeningProfile, candidates: List<Track>): List<RecommendationMix> {
+    private fun generateDailyMixes(
+        profile: ListeningProfile,
+        candidates: List<Track>,
+        consumedTrackIds: MutableSet<String>
+    ): List<RecommendationMix> {
         val mixes = mutableListOf<RecommendationMix>()
 
         if (!profile.isColdStart && profile.topArtists.isNotEmpty()) {
-            // Mix 1: Top Artist #1 Focus
+            // Mix 1: Top Artist #1 Focus + Related Candidates
             val artist1 = profile.topArtists.first().artistName
             val artist1Tracks = candidates.filter { it.artist.contains(artist1, ignoreCase = true) }
             val otherCandidates = candidates.filter { !it.artist.contains(artist1, ignoreCase = true) }
-            val mix1Pool = (artist1Tracks.take(6) + otherCandidates.shuffled(Random(101)).take(9))
+            val mix1Pool = (artist1Tracks.take(6) + otherCandidates.shuffled(Random(101)).take(8))
             val mix1Tracks = diversifyTracks(mix1Pool.distinctBy { it.id }, maxConsecutivePerArtist = 2)
 
             if (mix1Tracks.isNotEmpty()) {
@@ -163,14 +139,16 @@ class RecommendationEngineImpl : RecommendationEngine {
                         coverArtUrls = mix1Tracks.mapNotNull { it.thumbnailUrl.takeIf { u -> u.isNotBlank() } }.take(4)
                     )
                 )
+                consumedTrackIds.addAll(mix1Tracks.map { it.id })
             }
 
             // Mix 2: Top Artist #2 (or runner up) Focus
             val artist2 = profile.topArtists.getOrNull(1)?.artistName
             if (artist2 != null) {
-                val artist2Tracks = candidates.filter { it.artist.contains(artist2, ignoreCase = true) }
-                val remaining = candidates.filter { !it.artist.contains(artist2, ignoreCase = true) }
-                val mix2Pool = (artist2Tracks.take(6) + remaining.shuffled(Random(202)).take(9))
+                val availableForMix2 = candidates.filter { it.id !in consumedTrackIds }
+                val artist2Tracks = availableForMix2.filter { it.artist.contains(artist2, ignoreCase = true) }
+                val remaining = availableForMix2.filter { !it.artist.contains(artist2, ignoreCase = true) }
+                val mix2Pool = (artist2Tracks.take(6) + remaining.shuffled(Random(202)).take(8))
                 val mix2Tracks = diversifyTracks(mix2Pool.distinctBy { it.id }, maxConsecutivePerArtist = 2)
 
                 if (mix2Tracks.isNotEmpty()) {
@@ -183,12 +161,16 @@ class RecommendationEngineImpl : RecommendationEngine {
                             coverArtUrls = mix2Tracks.mapNotNull { it.thumbnailUrl.takeIf { u -> u.isNotBlank() } }.take(4)
                         )
                     )
+                    consumedTrackIds.addAll(mix2Tracks.map { it.id })
                 }
             }
 
             // Mix 3: Discovery Mix
             val knownIds = (profile.recentTracks.map { it.id } + profile.likedTrackIds).toSet()
-            val freshCandidates = candidates.filter { !knownIds.contains(it.id) }.shuffled(Random(303)).take(15)
+            val freshCandidates = candidates
+                .filter { it.id !in consumedTrackIds && it.id !in knownIds }
+                .shuffled(Random(303))
+                .take(12)
             val mix3Tracks = diversifyTracks(freshCandidates, maxConsecutivePerArtist = 2)
             if (mix3Tracks.isNotEmpty()) {
                 mixes.add(
@@ -200,10 +182,11 @@ class RecommendationEngineImpl : RecommendationEngine {
                         coverArtUrls = mix3Tracks.mapNotNull { it.thumbnailUrl.takeIf { u -> u.isNotBlank() } }.take(4)
                     )
                 )
+                consumedTrackIds.addAll(mix3Tracks.map { it.id })
             }
         } else {
             // Cold start curated starter mixes
-            val chunks = candidates.chunked(12)
+            val chunks = candidates.chunked(10)
             val starterNames = listOf(
                 "Trending Hits" to "Top trending music right now",
                 "Chill Vibes" to "Laid back and acoustic rhythms",
@@ -211,7 +194,8 @@ class RecommendationEngineImpl : RecommendationEngine {
             )
 
             for ((index, pair) in starterNames.withIndex()) {
-                val pool = chunks.getOrNull(index) ?: candidates.shuffled(Random(index * 99 + 1)).take(12)
+                val pool = (chunks.getOrNull(index) ?: candidates.shuffled(Random(index * 99 + 1)).take(10))
+                    .filter { it.id !in consumedTrackIds }
                 val tracks = diversifyTracks(pool, maxConsecutivePerArtist = 2)
                 if (tracks.isNotEmpty()) {
                     mixes.add(
@@ -223,6 +207,7 @@ class RecommendationEngineImpl : RecommendationEngine {
                             coverArtUrls = tracks.mapNotNull { it.thumbnailUrl.takeIf { u -> u.isNotBlank() } }.take(4)
                         )
                     )
+                    consumedTrackIds.addAll(tracks.map { it.id })
                 }
             }
         }
@@ -230,71 +215,96 @@ class RecommendationEngineImpl : RecommendationEngine {
         return mixes
     }
 
-    private fun generateOnRepeat(profile: ListeningProfile, candidates: List<Track>): List<Track> {
-        val candidateMap = candidates.associateBy { it.id }
-        val repeatAffinityTracks = profile.topTracks
-            .filter { it.playCount >= 2 }
-            .take(12)
-
-        if (repeatAffinityTracks.isEmpty()) return emptyList()
-
-        return repeatAffinityTracks.mapNotNull { affinity ->
-            profile.recentTracks.find { it.id == affinity.trackId }
-                ?: candidateMap[affinity.trackId]
-                ?: Track(
-                    id = affinity.trackId,
-                    title = affinity.title,
-                    artist = affinity.artist
-                )
+    private fun generateWeeklyDiscover(
+        candidates: List<Track>,
+        knownTrackIds: Set<String>,
+        consumedTrackIds: MutableSet<String>
+    ): List<Track> {
+        // Strictly exclude tracks already selected in Daily Mix AND tracks in listening history
+        val freshDiscoveryPool = candidates.filter { candidate ->
+            !consumedTrackIds.contains(candidate.id) && !knownTrackIds.contains(candidate.id)
         }
+
+        val diversified = diversifyTracks(freshDiscoveryPool, maxConsecutivePerArtist = 2).take(15)
+        consumedTrackIds.addAll(diversified.map { it.id })
+        return diversified
     }
 
-    private fun generateDiscoverWeekly(
+    private fun generateFurtherRecommendations(
         profile: ListeningProfile,
         candidates: List<Track>,
-        knownTrackIds: Set<String>
-    ): List<Track> {
-        val fresh = candidates.filter { !knownTrackIds.contains(it.id) }
-        val artistScoreMap = profile.topArtists.associate { it.artistName.lowercase() to it.score }
+        consumedTrackIds: MutableSet<String>
+    ): List<RecommendationSection> {
+        val sections = mutableListOf<RecommendationSection>()
 
-        val scored = fresh.map { track ->
-            val artistScore = artistScoreMap[track.artist.lowercase()] ?: 0.0
-            track to artistScore
-        }.sortedByDescending { it.second }.map { it.first }
+        // 1. Because You Listened To [Artist]
+        if (profile.topArtists.isNotEmpty()) {
+            val topArtist = profile.topArtists.first().artistName
+            val artistTracks = candidates
+                .filter { it.artist.contains(topArtist, ignoreCase = true) }
+                .take(12)
 
-        return diversifyTracks(scored, maxConsecutivePerArtist = 2).take(15)
+            if (artistTracks.isNotEmpty()) {
+                sections.add(
+                    RecommendationSection(
+                        type = SectionType.BECAUSE_YOU_LISTENED,
+                        title = "Because You Listened To $topArtist",
+                        subtitle = "More tracks from and inspired by your top artist",
+                        tracks = artistTracks
+                    )
+                )
+                consumedTrackIds.addAll(artistTracks.map { it.id })
+            }
+        }
+
+        // 2. Extra Discovery Rail if distinct candidates remain
+        val remainingUnconsumed = candidates.filter { !consumedTrackIds.contains(it.id) }
+        if (remainingUnconsumed.size >= 4) {
+            val extraTracks = diversifyTracks(remainingUnconsumed, maxConsecutivePerArtist = 2).take(12)
+            if (extraTracks.size >= 4) {
+                sections.add(
+                    RecommendationSection(
+                        type = SectionType.QUICK_PICKS,
+                        title = "Explore More",
+                        subtitle = "Selected from your preferred genres",
+                        tracks = extraTracks
+                    )
+                )
+                consumedTrackIds.addAll(extraTracks.map { it.id })
+            }
+        }
+
+        return sections
     }
 
     /**
-     * Enforces artist diversity constraint:
-     * - No more than [maxConsecutivePerArtist] consecutive songs by the same artist.
-     * - Reorders tracks smoothly to maintain variety without dropping songs unnecessarily.
+     * Enforces artist diversification: at most [maxConsecutivePerArtist] consecutive tracks
+     * from the same artist in any recommended sequence.
      */
     fun diversifyTracks(tracks: List<Track>, maxConsecutivePerArtist: Int = 2): List<Track> {
         if (tracks.size <= 2) return tracks
 
         val result = mutableListOf<Track>()
-        val remaining = tracks.toMutableList()
+        val pending = tracks.toMutableList()
 
-        while (remaining.isNotEmpty()) {
-            val lastArtist = result.lastOrNull()?.artist
-            val secondLastArtist = if (result.size >= 2) result[result.size - 2].artist else null
+        while (pending.isNotEmpty()) {
+            val lastArtist = result.lastOrNull()?.artist?.lowercase()?.trim()
+            val secondLastArtist = if (result.size >= 2) result[result.size - 2].artist.lowercase().trim() else null
 
-            val mustAvoidSame = lastArtist != null &&
-                    secondLastArtist != null &&
-                    lastArtist.equals(secondLastArtist, ignoreCase = true)
+            val isBlocked = lastArtist != null && secondLastArtist != null &&
+                    lastArtist == secondLastArtist
 
-            val candidateIndex = if (mustAvoidSame) {
-                // Find first track by a different artist
-                remaining.indexOfFirst { !it.artist.equals(lastArtist, ignoreCase = true) }.let {
-                    if (it == -1) 0 else it
-                }
+            val candidateIndex = if (isBlocked) {
+                pending.indexOfFirst { it.artist.lowercase().trim() != lastArtist }
             } else {
                 0
             }
 
-            val chosen = remaining.removeAt(candidateIndex)
-            result.add(chosen)
+            if (candidateIndex >= 0) {
+                result.add(pending.removeAt(candidateIndex))
+            } else {
+                result.add(pending.removeAt(0))
+            }
         }
 
         return result

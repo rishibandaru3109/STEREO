@@ -7,6 +7,7 @@ import com.nova.music.domain.model.RecommendationSection
 import com.nova.music.domain.model.Track
 import com.nova.music.domain.repository.HomeRepository
 import com.nova.music.domain.repository.LikedSongsRepository
+import com.nova.music.domain.repository.MusicPreferencesRepository
 import com.nova.music.playback.NovaPlayerController
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -25,11 +26,16 @@ data class HomeFeedState(
     val errorMessage: String? = null
 )
 
-class HomeViewModel(
+class HomeViewModel @JvmOverloads constructor(
     private val homeRepository: HomeRepository,
     private val playerController: NovaPlayerController,
-    private val likedSongsRepository: LikedSongsRepository
+    private val likedSongsRepository: LikedSongsRepository,
+    private val preferencesRepository: MusicPreferencesRepository? = null
 ) : ViewModel() {
+
+    val isOnboardingCompleted: StateFlow<Boolean> = preferencesRepository?.isOnboardingCompleted
+        ?.stateIn(viewModelScope, SharingStarted.Eagerly, true)
+        ?: MutableStateFlow(true)
 
     private val _uiState = MutableStateFlow(HomeFeedState(isLoading = true))
     val uiState: StateFlow<HomeFeedState> = _uiState.asStateFlow()
@@ -110,6 +116,18 @@ class HomeViewModel(
         viewModelScope.launch {
             homeRepository.recordExplicitFeedback(track.id, "NOT_INTERESTED")
             // Refresh feed to remove candidate
+            loadHomeFeed(forceRefresh = true)
+        }
+    }
+
+    fun completeOnboarding(languages: Set<String>, genres: Set<String>, discoveryMode: String) {
+        viewModelScope.launch {
+            preferencesRepository?.apply {
+                setPreferredLanguages(languages)
+                setPreferredGenres(genres)
+                setDiscoveryMode(discoveryMode)
+                setOnboardingCompleted(true)
+            }
             loadHomeFeed(forceRefresh = true)
         }
     }

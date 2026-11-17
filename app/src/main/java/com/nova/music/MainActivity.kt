@@ -46,6 +46,8 @@ import com.nova.music.feature.player.MiniPlayer
 import com.nova.music.feature.player.PlayerViewModel
 import com.nova.music.feature.search.SearchScreen
 import com.nova.music.feature.search.SearchViewModel
+import com.nova.music.feature.settings.SettingsScreen
+import com.nova.music.feature.settings.SettingsViewModel
 import com.nova.music.feature.theme.ThemeGalleryScreen
 import com.nova.music.feature.theme.ThemeStudioScreen
 import com.nova.music.feature.theme.ThemeViewModel
@@ -58,7 +60,8 @@ enum class SubScreen {
     PLAYLIST_DETAILS,
     THEMES,
     THEME_STUDIO,
-    WALLPAPER_STUDIO
+    WALLPAPER_STUDIO,
+    SETTINGS
 }
 
 class MainActivity : ComponentActivity() {
@@ -89,9 +92,15 @@ fun StereoApp() {
     val themeViewModel: ThemeViewModel = koinViewModel()
     val wallpaperViewModel: WallpaperViewModel = koinViewModel()
     val currentColors by themeViewModel.currentTheme.collectAsStateWithLifecycle()
+    val cardStyleMode by themeViewModel.cardStyleMode.collectAsStateWithLifecycle()
+    val advancedAppearance by themeViewModel.advancedAppearance.collectAsStateWithLifecycle()
     val wallpaperConfig by wallpaperViewModel.wallpaperConfig.collectAsStateWithLifecycle()
 
-    StereoTheme(colors = currentColors) {
+    StereoTheme(
+        colors = currentColors,
+        cardMode = cardStyleMode,
+        advancedConfig = advancedAppearance
+    ) {
         val homeViewModel: HomeViewModel = koinViewModel()
         val searchViewModel: SearchViewModel = koinViewModel()
         val playerViewModel: PlayerViewModel = koinViewModel()
@@ -108,7 +117,7 @@ fun StereoApp() {
                 activeSubScreen == SubScreen.THEME_STUDIO || activeSubScreen == SubScreen.WALLPAPER_STUDIO -> {
                     activeSubScreen = SubScreen.THEMES
                 }
-                activeSubScreen == SubScreen.THEMES -> {
+                activeSubScreen == SubScreen.THEMES || activeSubScreen == SubScreen.SETTINGS -> {
                     activeSubScreen = null
                 }
                 activeSubScreen == SubScreen.LIKED_SONGS || activeSubScreen == SubScreen.PLAYLIST_DETAILS -> {
@@ -184,6 +193,14 @@ fun StereoApp() {
                                     modifier = Modifier.fillMaxSize()
                                 )
                             }
+                            SubScreen.SETTINGS -> {
+                                val settingsViewModel: SettingsViewModel = koinViewModel()
+                                SettingsScreen(
+                                    viewModel = settingsViewModel,
+                                    onBackClick = { activeSubScreen = null },
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            }
                             null -> {}
                         }
                     } else {
@@ -198,6 +215,7 @@ fun StereoApp() {
                                     HomeScreen(
                                         viewModel = homeViewModel,
                                         onOpenThemeGallery = { activeSubScreen = SubScreen.THEMES },
+                                        onOpenSettings = { activeSubScreen = SubScreen.SETTINGS },
                                         modifier = Modifier.fillMaxSize()
                                     )
                                 }
@@ -206,6 +224,7 @@ fun StereoApp() {
                                         viewModel = searchViewModel,
                                         onOpenLibrary = { selectedTab = NavigationTab.LIBRARY },
                                         onOpenThemeGallery = { activeSubScreen = SubScreen.THEMES },
+                                        onOpenSettings = { activeSubScreen = SubScreen.SETTINGS },
                                         modifier = Modifier.fillMaxSize()
                                     )
                                 }
@@ -219,6 +238,7 @@ fun StereoApp() {
                                         },
                                         onOpenSearch = { selectedTab = NavigationTab.SEARCH },
                                         onOpenThemeGallery = { activeSubScreen = SubScreen.THEMES },
+                                        onOpenSettings = { activeSubScreen = SubScreen.SETTINGS },
                                         modifier = Modifier.fillMaxSize()
                                     )
                                 }

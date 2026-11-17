@@ -74,6 +74,7 @@ fun LibraryScreen(
     onOpenPlaylist: (String) -> Unit,
     onOpenSearch: () -> Unit,
     onOpenThemeGallery: () -> Unit,
+    onOpenSettings: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val colors = StereoTheme.colors
@@ -94,49 +95,20 @@ fun LibraryScreen(
         modifier = modifier
             .fillMaxSize()
             .background(colors.background)
-            .padding(horizontal = 16.dp)
     ) {
-        // Top App Bar
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "LIBRARY",
-                    style = MaterialTheme.typography.headlineMedium.copy(
-                        letterSpacing = 2.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = colors.textPrimary
-                    )
-                )
-                Text(
-                    text = "YOUR COLLECTION",
-                    style = MaterialTheme.typography.labelSmall.copy(
-                        letterSpacing = 1.sp,
-                        color = colors.primaryAccent
-                    )
-                )
-            }
+        Spacer(modifier = Modifier.height(8.dp))
 
-            IconButton(onClick = onOpenSearch) {
-                Icon(
-                    imageVector = Icons.Default.Search,
-                    contentDescription = "Search",
-                    tint = colors.textPrimary
-                )
-            }
+        // Compact Brand Header (Phase A1 & B3)
+        com.nova.music.feature.navigation.StereoTopHeader(
+            title = "Your Library",
+            subtitle = "COLLECTION",
+            onOpenSettings = onOpenSettings,
+            onOpenThemeGallery = onOpenThemeGallery
+        )
 
-            IconButton(onClick = onOpenThemeGallery) {
-                Icon(
-                    imageVector = Icons.Default.Palette,
-                    contentDescription = "Theme Studio",
-                    tint = colors.textPrimary
-                )
-            }
-        }
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Column(modifier = Modifier.padding(horizontal = 16.dp)) {
 
         LazyColumn(
             modifier = Modifier
@@ -506,6 +478,7 @@ fun LibraryScreen(
                 }
             }
         )
+    }
     }
 }
 

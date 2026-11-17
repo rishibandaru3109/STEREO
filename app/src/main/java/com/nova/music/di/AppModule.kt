@@ -25,6 +25,7 @@ import com.nova.music.data.repository.HistoryRepositoryImpl
 import com.nova.music.data.repository.HomeRepositoryImpl
 import com.nova.music.data.repository.LikedSongsRepositoryImpl
 import com.nova.music.data.repository.ListeningProfileRepositoryImpl
+import com.nova.music.data.repository.MusicPreferencesRepositoryImpl
 import com.nova.music.data.repository.MusicRepositoryImpl
 import com.nova.music.data.repository.PlaylistRepositoryImpl
 import com.nova.music.data.repository.QueuePersistenceRepository
@@ -37,12 +38,14 @@ import com.nova.music.domain.repository.HomeRepository
 import com.nova.music.domain.repository.LikedSongsRepository
 import com.nova.music.domain.repository.ListeningProfileRepository
 import com.nova.music.domain.repository.MusicExtractor
+import com.nova.music.domain.repository.MusicPreferencesRepository
 import com.nova.music.domain.repository.MusicRepository
 import com.nova.music.domain.repository.PlaylistRepository
 import com.nova.music.feature.home.HomeViewModel
 import com.nova.music.feature.library.LibraryViewModel
 import com.nova.music.feature.player.PlayerViewModel
 import com.nova.music.feature.search.SearchViewModel
+import com.nova.music.feature.settings.SettingsViewModel
 import com.nova.music.feature.theme.ThemeViewModel
 import com.nova.music.feature.wallpaper.WallpaperViewModel
 import com.nova.music.playback.ExoPlayerController
@@ -164,8 +167,15 @@ val appModule = module {
     }
 
     // Recommendation Engine & Providers
+    single<MusicPreferencesRepository> {
+        MusicPreferencesRepositoryImpl(androidContext())
+    }
+
     single<CandidateProvider> {
-        CatalogCandidateProvider(extractor = get())
+        CatalogCandidateProvider(
+            extractor = get(),
+            preferencesRepository = get()
+        )
     }
 
     single<RecommendationEngine> {
@@ -237,7 +247,8 @@ val appModule = module {
         HomeViewModel(
             homeRepository = get(),
             playerController = get(),
-            likedSongsRepository = get()
+            likedSongsRepository = get(),
+            preferencesRepository = get()
         )
     }
 
@@ -283,6 +294,17 @@ val appModule = module {
     viewModel {
         WallpaperViewModel(
             wallpaperRepository = get()
+        )
+    }
+
+    // Settings ViewModel
+    viewModel {
+        SettingsViewModel(
+            themeRepository = get(),
+            wallpaperRepository = get(),
+            preferencesRepository = get(),
+            historyRepository = get(),
+            context = androidContext()
         )
     }
 }

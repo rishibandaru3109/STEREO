@@ -14,7 +14,26 @@ class ThemePresetsTest {
     fun testAllTwelvePresetsExist() {
         val presets = ThemePresets.allPresets
         assertTrue("Expected at least 12 presets, found ${presets.size}", presets.size >= 12)
-        assertEquals(12, presets.size)
+    }
+
+    @Test
+    fun testOfficialSevenThemesExist() {
+        val official = ThemePresets.officialThemes
+        assertEquals(7, official.size)
+        val expectedOfficialIds = listOf(
+            "monochrome_minimal",
+            "frosted_glass",
+            "black_yellow",
+            "bluey",
+            "starry_glow",
+            "ivory_beige",
+            "pure_black"
+        )
+        for (id in expectedOfficialIds) {
+            val found = ThemePresets.getById(id)
+            assertNotNull("Official theme '$id' must exist", found)
+            assertEquals("Found theme should match requested id", id, found.id)
+        }
     }
 
     @Test
@@ -33,17 +52,18 @@ class ThemePresetsTest {
     @Test
     fun testExpectedPresetIdsPresent() {
         val expectedIds = listOf(
+            "monochrome_minimal",
+            "frosted_glass",
+            "black_yellow",
+            "bluey",
+            "starry_glow",
+            "ivory_beige",
+            "pure_black",
             "midnight_stereo",
             "vintage_cream",
             "burgundy_vinyl",
             "olive_radio",
-            "pure_amoled",
             "cassette_sunset",
-            "minimal_mono",
-            "album_atmosphere",
-            "ocean_tape",
-            "lavender_haze",
-            "copper_studio",
             "paper_and_ink"
         )
 

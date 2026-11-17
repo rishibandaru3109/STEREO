@@ -273,7 +273,7 @@ fun FullPlayerSheet(
                     Icon(
                         imageVector = Icons.Default.Shuffle,
                         contentDescription = "Shuffle",
-                        tint = if (state.isShuffle) colors.primaryAccent else colors.controlInactive,
+                        tint = if (state.isShuffle) colors.controlActive else colors.controlInactive,
                         modifier = Modifier.size(24.dp)
                     )
                 }
@@ -286,7 +286,7 @@ fun FullPlayerSheet(
                     Icon(
                         imageVector = Icons.Default.SkipPrevious,
                         contentDescription = "Previous",
-                        tint = colors.textPrimary,
+                        tint = colors.controlActive,
                         modifier = Modifier.size(32.dp)
                     )
                 }
@@ -296,21 +296,21 @@ fun FullPlayerSheet(
                     modifier = Modifier
                         .size(72.dp)
                         .clip(CircleShape)
-                        .background(colors.primaryAccent)
+                        .background(colors.controlActive)
                         .clickable(onClick = { viewModel.togglePlayPause() }),
                     contentAlignment = Alignment.Center
                 ) {
                     if (state.status == PlayerStatus.BUFFERING) {
                         CircularProgressIndicator(
                             modifier = Modifier.size(36.dp),
-                            color = if (colors.isDark) colors.background else colors.textPrimary,
+                            color = if (colors.isDark) Color.Black else Color.White,
                             strokeWidth = 3.dp
                         )
                     } else {
                         Icon(
                             imageVector = if (state.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                             contentDescription = if (state.isPlaying) "Pause" else "Play",
-                            tint = if (colors.isDark) colors.background else colors.textPrimary,
+                            tint = if (colors.isDark) Color.Black else Color.White,
                             modifier = Modifier.size(36.dp)
                         )
                     }
@@ -324,7 +324,7 @@ fun FullPlayerSheet(
                     Icon(
                         imageVector = Icons.Default.SkipNext,
                         contentDescription = "Next",
-                        tint = colors.textPrimary,
+                        tint = colors.controlActive,
                         modifier = Modifier.size(32.dp)
                     )
                 }
@@ -337,7 +337,7 @@ fun FullPlayerSheet(
                             else -> Icons.Default.Repeat
                         },
                         contentDescription = "Repeat",
-                        tint = if (state.repeatMode != RepeatMode.OFF) colors.primaryAccent else colors.controlInactive,
+                        tint = if (state.repeatMode != RepeatMode.OFF) colors.controlActive else colors.controlInactive,
                         modifier = Modifier.size(24.dp)
                     )
                 }

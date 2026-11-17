@@ -102,20 +102,20 @@ class ListeningProfileRepositoryImpl(
 
             if (isCompleted) {
                 stats.completionCount++
-                stats.score += 2.0 * decay
+                stats.score += 30.0 * decay
             } else if (isSkipped) {
                 stats.skipCount++
-                stats.score -= 2.5 * decay
+                stats.score -= 20.0 * decay
             } else {
                 // Partial listen
-                stats.score += 0.5 * decay
+                stats.score += 5.0 * decay
             }
         }
 
-        // 2. Add Liked Song bonus (+3.0)
+        // 2. Add Liked Song bonus (+30.0 per Phase H3)
         for (likedId in likedIds) {
             val stats = trackStatsMap.getOrPut(likedId) { TrackStats(likedId) }
-            stats.score += 3.0
+            stats.score += 30.0
         }
 
         // 3. Assemble Track Affinities

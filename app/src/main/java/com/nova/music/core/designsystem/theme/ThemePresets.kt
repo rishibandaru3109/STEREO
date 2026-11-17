@@ -4,9 +4,206 @@ import androidx.compose.ui.graphics.Color
 
 /**
  * Built-in Theme Presets for STEREO.
- * 12 distinct, high-quality audio aesthetic palettes.
+ * Features 7 Official Themes and classic audio aesthetic palettes.
  */
 object ThemePresets {
+
+    // ========================================================================
+    // 7 OFFICIAL STEREO THEMES (PHASE C)
+    // ========================================================================
+
+    /**
+     * Theme 1 — Monochrome Minimal
+     * Strictly monochromatic, minimal visual noise, strong typography, subtle borders.
+     */
+    val MonochromeMinimal = StereoColors(
+        id = "monochrome_minimal",
+        name = "Monochrome Minimal",
+        isDark = true,
+        background = Color(0xFF0A0A0A),
+        backgroundSecondary = Color(0xFF141414),
+        surface = Color(0xFF1E1E1E),
+        surfaceElevated = Color(0xFF262626),
+        surfaceHighlight = Color(0xFF383838),
+        primaryAccent = Color(0xFFFFFFFF),
+        secondaryAccent = Color(0xFFD4D4D4),
+        textPrimary = Color(0xFFFFFFFF),
+        textSecondary = Color(0xFFA3A3A3),
+        textTertiary = Color(0xFF666666),
+        playerBackground = Color(0xFF0A0A0A),
+        miniPlayerBackground = Color(0xFF181818),
+        controlActive = Color(0xFFFFFFFF),
+        controlInactive = Color(0xFF666666),
+        sliderTrack = Color(0xFF383838),
+        sliderThumb = Color(0xFFFFFFFF),
+        divider = Color(0xFF262626)
+    )
+
+    /**
+     * Theme 2 — Frosted Glass
+     * Translucent surfaces, frosted glass blur, glass-like navigation & player surfaces, layered depth.
+     */
+    val FrostedGlass = StereoColors(
+        id = "frosted_glass",
+        name = "Frosted Glass",
+        isDark = true,
+        background = Color(0xFF0E131F),
+        backgroundSecondary = Color(0xFF141B2D),
+        surface = Color(0xFF1D263B),
+        surfaceElevated = Color(0xFF28344E),
+        surfaceHighlight = Color(0xFF3B4D70),
+        primaryAccent = Color(0xFF64B5F6),
+        secondaryAccent = Color(0xFF80D8FF),
+        textPrimary = Color(0xFFF0F4F8),
+        textSecondary = Color(0xFFA6B8CE),
+        textTertiary = Color(0xFF6A7B95),
+        playerBackground = Color(0xFF0E131F),
+        miniPlayerBackground = Color(0xFF1A2234),
+        controlActive = Color(0xFF80D8FF),
+        controlInactive = Color(0xFF6A7B95),
+        sliderTrack = Color(0xFF3B4D70),
+        sliderThumb = Color(0xFF80D8FF),
+        divider = Color(0xFF28344E)
+    )
+
+    /**
+     * Theme 3 — Black & Yellow
+     * Deep black or charcoal backgrounds, bright yellow interactive accents.
+     */
+    val BlackAndYellow = StereoColors(
+        id = "black_yellow",
+        name = "Black & Yellow",
+        isDark = true,
+        background = Color(0xFF0C0C0D),
+        backgroundSecondary = Color(0xFF141416),
+        surface = Color(0xFF1C1C20),
+        surfaceElevated = Color(0xFF26262B),
+        surfaceHighlight = Color(0xFF36363D),
+        primaryAccent = Color(0xFFFFD600),
+        secondaryAccent = Color(0xFFFFEA00),
+        textPrimary = Color(0xFFFDFDFD),
+        textSecondary = Color(0xFFB8B8BD),
+        textTertiary = Color(0xFF7A7A80),
+        playerBackground = Color(0xFF0C0C0D),
+        miniPlayerBackground = Color(0xFF19191C),
+        controlActive = Color(0xFFFFD600),
+        controlInactive = Color(0xFF7A7A80),
+        sliderTrack = Color(0xFF36363D),
+        sliderThumb = Color(0xFFFFD600),
+        divider = Color(0xFF26262B)
+    )
+
+    /**
+     * Theme 4 — Bluey
+     * Deep navy surfaces, rich blue gradients, electric/icy blue accents.
+     */
+    val Bluey = StereoColors(
+        id = "bluey",
+        name = "Bluey",
+        isDark = true,
+        background = Color(0xFF070D1E),
+        backgroundSecondary = Color(0xFF0C162E),
+        surface = Color(0xFF121F40),
+        surfaceElevated = Color(0xFF1A2C56),
+        surfaceHighlight = Color(0xFF263D73),
+        primaryAccent = Color(0xFF00B4D8),
+        secondaryAccent = Color(0xFF90E0EF),
+        textPrimary = Color(0xFFE8F4F8),
+        textSecondary = Color(0xFF9AB8CC),
+        textTertiary = Color(0xFF5C7C94),
+        playerBackground = Color(0xFF070D1E),
+        miniPlayerBackground = Color(0xFF101C38),
+        controlActive = Color(0xFF00B4D8),
+        controlInactive = Color(0xFF5C7C94),
+        sliderTrack = Color(0xFF263D73),
+        sliderThumb = Color(0xFF00B4D8),
+        divider = Color(0xFF1A2C56)
+    )
+
+    /**
+     * Theme 5 — Starry Glow
+     * Dark night-sky background, subtle star-like elements, soft ambient glows.
+     */
+    val StarryGlow = StereoColors(
+        id = "starry_glow",
+        name = "Starry Glow",
+        isDark = true,
+        background = Color(0xFF080812),
+        backgroundSecondary = Color(0xFF0F1020),
+        surface = Color(0xFF171830),
+        surfaceElevated = Color(0xFF222442),
+        surfaceHighlight = Color(0xFF343760),
+        primaryAccent = Color(0xFF9D4EDD),
+        secondaryAccent = Color(0xFFC77DFF),
+        textPrimary = Color(0xFFF3E8FF),
+        textSecondary = Color(0xFFB4A0D4),
+        textTertiary = Color(0xFF736094),
+        playerBackground = Color(0xFF080812),
+        miniPlayerBackground = Color(0xFF141528),
+        controlActive = Color(0xFFC77DFF),
+        controlInactive = Color(0xFF736094),
+        sliderTrack = Color(0xFF343760),
+        sliderThumb = Color(0xFFC77DFF),
+        divider = Color(0xFF222442)
+    )
+
+    /**
+     * Theme 6 — Ivory & Beige
+     * Warm light theme, soft white and cream backgrounds, beige and muted warm accents.
+     */
+    val IvoryAndBeige = StereoColors(
+        id = "ivory_beige",
+        name = "Ivory & Beige",
+        isDark = false,
+        background = Color(0xFFFBF8F3),
+        backgroundSecondary = Color(0xFFF4EDE2),
+        surface = Color(0xFFEAE1D2),
+        surfaceElevated = Color(0xFFDFD4C1),
+        surfaceHighlight = Color(0xFFCFC2AC),
+        primaryAccent = Color(0xFF9C6644),
+        secondaryAccent = Color(0xFFB08968),
+        textPrimary = Color(0xFF2D251E),
+        textSecondary = Color(0xFF68594E),
+        textTertiary = Color(0xFF968476),
+        playerBackground = Color(0xFFFBF8F3),
+        miniPlayerBackground = Color(0xFFF0E7D8),
+        controlActive = Color(0xFF9C6644),
+        controlInactive = Color(0xFF968476),
+        sliderTrack = Color(0xFFCFC2AC),
+        sliderThumb = Color(0xFF9C6644),
+        divider = Color(0xFFDFD4C1)
+    )
+
+    /**
+     * Theme 7 — Pure Black
+     * OLED-oriented true black background, subtle gray surfaces, high contrast.
+     */
+    val PureBlack = StereoColors(
+        id = "pure_black",
+        name = "Pure Black",
+        isDark = true,
+        background = Color(0xFF000000),
+        backgroundSecondary = Color(0xFF080808),
+        surface = Color(0xFF121212),
+        surfaceElevated = Color(0xFF1B1B1B),
+        surfaceHighlight = Color(0xFF262626),
+        primaryAccent = Color(0xFFE58B24),
+        secondaryAccent = Color(0xFFD4AF37),
+        textPrimary = Color(0xFFFFFFFF),
+        textSecondary = Color(0xFFB3B3B3),
+        textTertiary = Color(0xFF707070),
+        playerBackground = Color(0xFF000000),
+        miniPlayerBackground = Color(0xFF101010),
+        controlActive = Color(0xFFE58B24),
+        controlInactive = Color(0xFF707070),
+        sliderTrack = Color(0xFF222222),
+        sliderThumb = Color(0xFFE58B24),
+        divider = Color(0xFF181818)
+    )
+
+    // ========================================================================
+    // CLASSIC STEREO PALETTES
+    // ========================================================================
 
     val MidnightStereo = StereoColors(
         id = "midnight_stereo",
@@ -100,165 +297,27 @@ object ThemePresets {
         divider = Color(0xFF2D3A2D)
     )
 
-    val PureAmoled = StereoColors(
-        id = "pure_amoled",
-        name = "Pure AMOLED",
-        isDark = true,
-        background = Color(0xFF000000),
-        backgroundSecondary = Color(0xFF080808),
-        surface = Color(0xFF121212),
-        surfaceElevated = Color(0xFF1C1C1C),
-        surfaceHighlight = Color(0xFF2A2A2A),
-        primaryAccent = Color(0xFFFFA726),
-        secondaryAccent = Color(0xFFFFCC80),
-        textPrimary = Color(0xFFFFFFFF),
-        textSecondary = Color(0xFFB0B0B0),
-        textTertiary = Color(0xFF666666),
-        playerBackground = Color(0xFF000000),
-        miniPlayerBackground = Color(0xFF0F0F0F),
-        controlActive = Color(0xFFFFA726),
-        controlInactive = Color(0xFF666666),
-        sliderTrack = Color(0xFF2A2A2A),
-        sliderThumb = Color(0xFFFFA726),
-        divider = Color(0xFF1C1C1C)
-    )
-
     val CassetteSunset = StereoColors(
         id = "cassette_sunset",
         name = "Cassette Sunset",
         isDark = true,
-        background = Color(0xFF160F0C),
-        backgroundSecondary = Color(0xFF221612),
-        surface = Color(0xFF301F1A),
-        surfaceElevated = Color(0xFF3F2922),
-        surfaceHighlight = Color(0xFF53372E),
-        primaryAccent = Color(0xFFFF6B35),
-        secondaryAccent = Color(0xFFF79256),
-        textPrimary = Color(0xFFFFF4ED),
-        textSecondary = Color(0xFFC9A89A),
-        textTertiary = Color(0xFF856A5E),
-        playerBackground = Color(0xFF160F0C),
-        miniPlayerBackground = Color(0xFF261813),
-        controlActive = Color(0xFFFF6B35),
-        controlInactive = Color(0xFF856A5E),
-        sliderTrack = Color(0xFF53372E),
-        sliderThumb = Color(0xFFFF6B35),
-        divider = Color(0xFF3F2922)
-    )
-
-    val MinimalMono = StereoColors(
-        id = "minimal_mono",
-        name = "Minimal Mono",
-        isDark = true,
-        background = Color(0xFF0C0C0C),
-        backgroundSecondary = Color(0xFF161616),
-        surface = Color(0xFF202020),
-        surfaceElevated = Color(0xFF2C2C2C),
-        surfaceHighlight = Color(0xFF3C3C3C),
-        primaryAccent = Color(0xFFE0E0E0),
-        secondaryAccent = Color(0xFF9E9E9E),
-        textPrimary = Color(0xFFF5F5F5),
-        textSecondary = Color(0xFF9E9E9E),
-        textTertiary = Color(0xFF616161),
-        playerBackground = Color(0xFF0C0C0C),
-        miniPlayerBackground = Color(0xFF1A1A1A),
-        controlActive = Color(0xFFFFFFFF),
-        controlInactive = Color(0xFF616161),
-        sliderTrack = Color(0xFF3C3C3C),
-        sliderThumb = Color(0xFFFFFFFF),
-        divider = Color(0xFF2C2C2C)
-    )
-
-    val AlbumAtmosphere = StereoColors(
-        id = "album_atmosphere",
-        name = "Album Atmosphere",
-        isDark = true,
-        background = Color(0xFF110E18),
-        backgroundSecondary = Color(0xFF1B1626),
-        surface = Color(0xFF262035),
-        surfaceElevated = Color(0xFF342C47),
-        surfaceHighlight = Color(0xFF453B5D),
-        primaryAccent = Color(0xFFA78BFA),
-        secondaryAccent = Color(0xFF818CF8),
-        textPrimary = Color(0xFFF5F3FF),
-        textSecondary = Color(0xFFA7A0BA),
-        textTertiary = Color(0xFF6A637C),
-        playerBackground = Color(0xFF110E18),
-        miniPlayerBackground = Color(0xFF1E182A),
-        controlActive = Color(0xFFA78BFA),
-        controlInactive = Color(0xFF6A637C),
-        sliderTrack = Color(0xFF453B5D),
-        sliderThumb = Color(0xFFA78BFA),
-        divider = Color(0xFF342C47)
-    )
-
-    val OceanTape = StereoColors(
-        id = "ocean_tape",
-        name = "Ocean Tape",
-        isDark = true,
-        background = Color(0xFF0A1118),
-        backgroundSecondary = Color(0xFF101C26),
-        surface = Color(0xFF172736),
-        surfaceElevated = Color(0xFF203448),
-        surfaceHighlight = Color(0xFF2C4660),
-        primaryAccent = Color(0xFF38BDF8),
-        secondaryAccent = Color(0xFF0284C7),
-        textPrimary = Color(0xFFF0F9FF),
-        textSecondary = Color(0xFF94A3B8),
-        textTertiary = Color(0xFF52637A),
-        playerBackground = Color(0xFF0A1118),
-        miniPlayerBackground = Color(0xFF121E2A),
-        controlActive = Color(0xFF38BDF8),
-        controlInactive = Color(0xFF52637A),
-        sliderTrack = Color(0xFF2C4660),
-        sliderThumb = Color(0xFF38BDF8),
-        divider = Color(0xFF203448)
-    )
-
-    val LavenderHaze = StereoColors(
-        id = "lavender_haze",
-        name = "Lavender Haze",
-        isDark = true,
-        background = Color(0xFF131018),
-        backgroundSecondary = Color(0xFF1C1823),
-        surface = Color(0xFF272231),
-        surfaceElevated = Color(0xFF352E42),
-        surfaceHighlight = Color(0xFF453C56),
-        primaryAccent = Color(0xFFC084FC),
-        secondaryAccent = Color(0xFFE879F9),
-        textPrimary = Color(0xFFFAF5FF),
-        textSecondary = Color(0xFFAD9FBF),
-        textTertiary = Color(0xFF6E627E),
-        playerBackground = Color(0xFF131018),
-        miniPlayerBackground = Color(0xFF1E1927),
-        controlActive = Color(0xFFC084FC),
-        controlInactive = Color(0xFF6E627E),
-        sliderTrack = Color(0xFF453C56),
-        sliderThumb = Color(0xFFC084FC),
-        divider = Color(0xFF352E42)
-    )
-
-    val CopperStudio = StereoColors(
-        id = "copper_studio",
-        name = "Copper Studio",
-        isDark = true,
-        background = Color(0xFF140F0D),
-        backgroundSecondary = Color(0xFF1F1714),
-        surface = Color(0xFF2B201C),
-        surfaceElevated = Color(0xFF382B25),
-        surfaceHighlight = Color(0xFF4C3B33),
-        primaryAccent = Color(0xFFD97706),
-        secondaryAccent = Color(0xFFB45309),
-        textPrimary = Color(0xFFFEF3C7),
-        textSecondary = Color(0xFFB89C82),
-        textTertiary = Color(0xFF7A6451),
-        playerBackground = Color(0xFF140F0D),
-        miniPlayerBackground = Color(0xFF221814),
-        controlActive = Color(0xFFD97706),
-        controlInactive = Color(0xFF7A6451),
-        sliderTrack = Color(0xFF4C3B33),
-        sliderThumb = Color(0xFFD97706),
-        divider = Color(0xFF382B25)
+        background = Color(0xFF130E14),
+        backgroundSecondary = Color(0xFF1D141F),
+        surface = Color(0xFF281A2B),
+        surfaceElevated = Color(0xFF35223A),
+        surfaceHighlight = Color(0xFF472D4D),
+        primaryAccent = Color(0xFFF97316),
+        secondaryAccent = Color(0xFFE11D48),
+        textPrimary = Color(0xFFFFF1F2),
+        textSecondary = Color(0xFFBEAABF),
+        textTertiary = Color(0xFF7A687B),
+        playerBackground = Color(0xFF130E14),
+        miniPlayerBackground = Color(0xFF221625),
+        controlActive = Color(0xFFF97316),
+        controlInactive = Color(0xFF7A687B),
+        sliderTrack = Color(0xFF472D4D),
+        sliderThumb = Color(0xFFF97316),
+        divider = Color(0xFF35223A)
     )
 
     val PaperAndInk = StereoColors(
@@ -285,20 +344,27 @@ object ThemePresets {
     )
 
     /**
-     * All 12 built-in presets in display order.
+     * The 7 Official STEREO Themes required by Directive Phase C.
      */
-    val allPresets: List<StereoColors> = listOf(
+    val officialThemes: List<StereoColors> = listOf(
+        MonochromeMinimal,
+        FrostedGlass,
+        BlackAndYellow,
+        Bluey,
+        StarryGlow,
+        IvoryAndBeige,
+        PureBlack
+    )
+
+    /**
+     * All built-in presets in display order.
+     */
+    val allPresets: List<StereoColors> = officialThemes + listOf(
         MidnightStereo,
         VintageCream,
         BurgundyVinyl,
         OliveRadio,
-        PureAmoled,
         CassetteSunset,
-        MinimalMono,
-        AlbumAtmosphere,
-        OceanTape,
-        LavenderHaze,
-        CopperStudio,
         PaperAndInk
     )
 

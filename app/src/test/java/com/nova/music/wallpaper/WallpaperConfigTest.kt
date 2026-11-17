@@ -101,4 +101,20 @@ class WallpaperConfigTest {
             assertNotNull("Gradient preset ${preset.name} brush must not be null", brush)
         }
     }
+
+    @Test
+    fun testCustomImageModeAndSerialization() {
+        val customConfig = WallpaperConfig(
+            mode = WallpaperMode.CUSTOM_IMAGE,
+            customImageUri = "content://media/external/images/media/42",
+            blurRadius = 35f,
+            dimmingAlpha = 0.50f
+        )
+        val json = customConfig.toJson()
+        val restored = WallpaperConfig.fromJson(json)
+        assertEquals(WallpaperMode.CUSTOM_IMAGE, restored.mode)
+        assertEquals("content://media/external/images/media/42", restored.customImageUri)
+        assertEquals(35f, restored.blurRadius, 0.01f)
+        assertEquals(0.50f, restored.dimmingAlpha, 0.01f)
+    }
 }

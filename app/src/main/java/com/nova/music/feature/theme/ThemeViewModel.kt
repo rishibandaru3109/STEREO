@@ -2,6 +2,8 @@ package com.nova.music.feature.theme
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.nova.music.core.designsystem.theme.AdvancedAppearanceConfig
+import com.nova.music.core.designsystem.theme.CardStyleMode
 import com.nova.music.core.designsystem.theme.CustomTheme
 import com.nova.music.core.designsystem.theme.StereoColors
 import com.nova.music.core.designsystem.theme.ThemePresets
@@ -19,14 +21,28 @@ class ThemeViewModel(
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.Eagerly,
-            initialValue = ThemePresets.MidnightStereo.id
+            initialValue = ThemePresets.MonochromeMinimal.id
         )
 
     val currentTheme: StateFlow<StereoColors> = themeRepository.selectedTheme
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.Eagerly,
-            initialValue = ThemePresets.MidnightStereo
+            initialValue = ThemePresets.MonochromeMinimal
+        )
+
+    val cardStyleMode: StateFlow<CardStyleMode> = themeRepository.cardStyleMode
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.Eagerly,
+            initialValue = CardStyleMode.DEFAULT
+        )
+
+    val advancedAppearance: StateFlow<AdvancedAppearanceConfig> = themeRepository.advancedAppearance
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.Eagerly,
+            initialValue = AdvancedAppearanceConfig()
         )
 
     val customThemes: StateFlow<List<CustomTheme>> = themeRepository.customThemes
@@ -36,11 +52,36 @@ class ThemeViewModel(
             initialValue = emptyList()
         )
 
+    val officialThemes: List<StereoColors> = ThemePresets.officialThemes
     val allPresets: List<StereoColors> = ThemePresets.allPresets
 
     fun selectTheme(themeId: String) {
         viewModelScope.launch {
             themeRepository.setThemeId(themeId)
+        }
+    }
+
+    fun setCardStyleMode(mode: CardStyleMode) {
+        viewModelScope.launch {
+            themeRepository.setCardStyleMode(mode)
+        }
+    }
+
+    fun setAdvancedAppearance(config: AdvancedAppearanceConfig) {
+        viewModelScope.launch {
+            themeRepository.setAdvancedAppearance(config)
+        }
+    }
+
+    fun resetAdvancedAppearance() {
+        viewModelScope.launch {
+            themeRepository.resetAdvancedAppearance()
+        }
+    }
+
+    fun restoreThemeDefaults() {
+        viewModelScope.launch {
+            themeRepository.restoreThemeDefaults()
         }
     }
 
