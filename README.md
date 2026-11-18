@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/rishibandaru3109/STEREO/releases"><img src="https://img.shields.io/badge/Release-v1.0.0--alpha.3-blue.svg?style=flat-square" alt="Latest Release" /></a>
+  <a href="https://github.com/rishibandaru3109/STEREO/releases"><img src="https://img.shields.io/badge/Release-v1.0.0--alpha.4-blue.svg?style=flat-square" alt="Latest Release" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-GPL--3.0-green.svg?style=flat-square" alt="License: GPL-3.0" /></a>
   <a href="https://developer.android.com/about/versions/oreo"><img src="https://img.shields.io/badge/Android-8.0%2B%20(API%2026%2B)-orange.svg?style=flat-square" alt="Android 8.0+" /></a>
   <a href="https://kotlinlang.org"><img src="https://img.shields.io/badge/Kotlin-2.0-purple.svg?style=flat-square" alt="Kotlin" /></a>
@@ -88,7 +88,7 @@ Discover music in the languages you actually love. STEREO features a searchable,
 - **Permissions:** Internet and Foreground Service Audio.
 
 ### Get the Latest APK
-1. Download `STEREO-1.0.0-alpha.3.apk` from the [Latest GitHub Release](https://github.com/rishibandaru3109/STEREO/releases).
+1. Download `STEREO-1.0.0-alpha.4.apk` from the [Latest GitHub Release](https://github.com/rishibandaru3109/STEREO/releases).
 2. Open the downloaded file on your Android device.
 3. If prompted, allow installation from unknown sources for your browser or file manager.
 4. Launch STEREO, select your favorite music languages, and enjoy!

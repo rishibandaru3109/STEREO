@@ -5,6 +5,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [1.0.0-alpha.4] - 2026-11-19
+
+### Added
+- **Permanent Production Release Signing:** Upgraded from the legacy debug signing certificate to a dedicated RSA 4096-bit production keystore valid through April 2054.
+- **Hierarchical Credential Security:** Configured Gradle to securely resolve signing credentials from environment variables or ignored properties without exposing secrets.
+- **Migration & Signing Documentation:** Added complete documentation on certificate fingerprints, backup protocols, and one-time Alpha.3 migration in `docs/SIGNING_AND_MIGRATION_GUIDE.md`.
+
+### Changed
+- Production release builds are now permanently signed under APK Signature Scheme v2 & v3 with SHA-256 fingerprint `7E:38:21:4D:3F:83:E4:FD:CC:1B:03:50:32:85:19:41:83:92:DB:E4:F6:B2:F1:AC:5F:B2:BD:03:96:D6:C0:64`.
+
+### Note for Alpha.3 Testers
+- Due to Android's security signature verification, upgrading from Alpha.3 requires a one-time clean uninstall of the old build before installing Alpha.4. All subsequent releases will update seamlessly.
+
+---
+
 ## [1.0.0-alpha.3] - 2026-11-18
 
 ### Added
