@@ -1,0 +1,57 @@
+name: Bug Report
+description: Create a report to help us improve STEREO
+title: "[BUG]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for reporting an issue! Please verify you are running the latest version of STEREO before opening this report.
+  - type: input
+    id: version
+    attributes:
+      label: STEREO Version
+      description: What version of STEREO are you running? (e.g. 1.0.0-alpha.3)
+      placeholder: 1.0.0-alpha.3
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: Device Information
+      description: Device model and Android version
+      placeholder: "Realme RMX5030, Android 16 (or Google Pixel 8, Android 14)"
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: Describe the Bug
+      description: A clear and concise description of what the bug is.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps To Reproduce
+      description: Exact steps to reproduce the behavior.
+      placeholder: |
+        1. Go to '...'
+        2. Tap on '....'
+        3. Scroll down to '....'
+        4. See error
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What you expected to happen.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant Logcat / Diagnostic Logs
+      description: Paste any relevant error output or logcat lines.
+      render: shell
