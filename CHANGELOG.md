@@ -5,6 +5,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [1.0.0-alpha.5] - 2026-11-19
+
+### Added
+- **Test Architecture Separation:** Separated 101 deterministic offline unit tests from external network integration tests using JUnit categories (`LiveNetworkTest`).
+- **Dedicated Live Integration Suite:** Preserved comprehensive live YouTube streaming and audio container validation tests in a separate `testLiveIntegration` task without gating standard CI.
+
+### Changed
+- **Extractor Resilience:** Enhanced `InnerTubeXExtractor` with `playlistItemData.videoId` extraction and improved `YouTubeMusicExtractor` with support for multi-column search layouts and fallback subtitle duration parsing.
+- **Build Performance & Memory:** Fine-tuned JVM and Kotlin daemon parameters in `gradle.properties` (`-Xmx1536m -XX:MaxMetaspaceSize=384m`) preventing compiler daemon memory exhaustion.
+- **Automated CI Validation:** Verified 100% green pass on GitHub Actions Linux CI for unit tests and release builds.
+
+### Compatibility
+- Signed with the identical permanent production RSA 4096-bit certificate as Alpha.4 (SHA-256: `7E:38:21:4D:3F:83:E4:FD:CC:1B:03:50:32:85:19:41:83:92:DB:E4:F6:B2:F1:AC:5F:B2:BD:03:96:D6:C0:64`).
+- **Seamless Upgrade:** Existing Alpha.4 users can install and update directly without uninstalling or resetting user data.
+
+---
+
 ## [1.0.0-alpha.4] - 2026-11-19
 
 ### Added
