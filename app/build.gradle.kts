@@ -1,3 +1,6 @@
+import java.io.FileInputStream
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -5,9 +8,36 @@ plugins {
     id("com.google.devtools.ksp")
 }
 
+val keystorePropertiesFile = rootProject.file("keystore.properties")
+val keystoreProperties = Properties().apply {
+    if (keystorePropertiesFile.exists()) {
+        load(FileInputStream(keystorePropertiesFile))
+    }
+}
+
 android {
     namespace = "com.nova.music"
     compileSdk = 34
+
+    signingConfigs {
+        create("release") {
+            val storeFilePath = System.getenv("STEREO_KEYSTORE_PATH")
+                ?: keystoreProperties.getProperty("RELEASE_STORE_FILE")
+            val storePasswordVal = System.getenv("STEREO_KEYSTORE_PASSWORD")
+                ?: keystoreProperties.getProperty("RELEASE_STORE_PASSWORD")
+            val keyAliasVal = System.getenv("STEREO_KEY_ALIAS")
+                ?: keystoreProperties.getProperty("RELEASE_KEY_ALIAS")
+            val keyPasswordVal = System.getenv("STEREO_KEY_PASSWORD")
+                ?: keystoreProperties.getProperty("RELEASE_KEY_PASSWORD")
+
+            if (!storeFilePath.isNullOrBlank() && file(storeFilePath).exists() && !storePasswordVal.isNullOrBlank()) {
+                storeFile = file(storeFilePath)
+                storePassword = storePasswordVal
+                keyAlias = keyAliasVal
+                keyPassword = keyPasswordVal
+            }
+        }
+    }
 
     defaultConfig {
         applicationId = "com.nova.music"
@@ -25,6 +55,7 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

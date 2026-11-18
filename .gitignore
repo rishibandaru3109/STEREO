@@ -2,6 +2,8 @@
 .gradle/
 local.properties
 /local.properties
+keystore.properties
+/keystore.properties
 .idea/
 /.idea/
 .DS_Store
@@ -19,4 +21,6 @@ release_backup/
 *.log
 *.jks
 *.keystore
+*.key
+*.p12
 test-output/
