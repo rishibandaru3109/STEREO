@@ -1,0 +1,9 @@
+STEREO is an independent, modern, open-source Android music streaming and discovery player built with Jetpack Compose, Material 3, and AndroidX Media3.
+
+Key Features:
+- 40-Language Music Discovery: Multi-select discovery covering South Asia, Europe, Americas, East & Southeast Asia, and Middle East & Africa with native typography.
+- Smart Recommendation Pipeline: YouTube Music song-radio candidates seeded from your liked songs and listening history.
+- Offline & Local First: All listening history, favorites, custom playlists, and queues are stored on-device in local SQLite via Room.
+- 7 Built-in Themes: Classic Dark, AMOLED True Black, Frosted Glass, Vintage Deck, Cyberpunk Neon, Pastel Breeze, and Deep Midnight.
+- Background Playback: Low-latency streaming with system MediaSession and lock-screen notification controls.
+- Zero Trackers: No ads, no third-party telemetry, and no account required.

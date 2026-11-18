@@ -1,0 +1,7 @@
+- Permanent production release signing with dedicated RSA 4096-bit keystore.
+- 40-language music discovery expansion with real-time search filtering.
+- YouTube Music personalized song radio recommendation pipeline.
+- Material 3 pull-to-refresh on Home and Search views.
+- 7 built-in themes and 2 card layout styles.
+- AndroidX Media3 background playback with lock-screen notification controls.
+- Zero analytics, zero trackers, and 100% on-device SQLite storage.
