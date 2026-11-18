@@ -35,17 +35,18 @@ class SurpriseMeEngineImpl(
         val recentTrackIds = profile.recentTracks.take(8).map { it.id }.toSet()
         val totalExcluded = excludedTrackIds + recentTrackIds + listOfNotNull(currentlyPlayingId)
 
-        val validCandidates = candidates.filter { it.id !in totalExcluded }
+        val validCandidates = candidates.filter { it.id !in totalExcluded }.distinctBy(Track::id)
 
         // 2. If valid candidates are empty, attempt fallback pool (e.g. liked songs / library)
         if (validCandidates.isEmpty()) {
             val validFallback = fallbackTracks.filter { it.id !in excludedTrackIds && it.id != currentlyPlayingId }
+                .distinctBy(Track::id)
             if (validFallback.isEmpty()) {
                 return SurpriseResult.Unavailable("No music available to surprise you right now. Check your internet connection or library.")
             }
 
             val fallbackSelected = validFallback.random(Random(System.currentTimeMillis()))
-            val remainingFallback = (validFallback.filter { it.id != fallbackSelected.id }.shuffled(Random(123)) + candidates).take(15)
+            val remainingFallback = validFallback.filter { it.id != fallbackSelected.id }.shuffled().take(15)
             val queue = listOf(fallbackSelected) + remainingFallback
             return SurpriseResult.Fallback(
                 selectedTrack = fallbackSelected,
@@ -57,7 +58,7 @@ class SurpriseMeEngineImpl(
         // 3. Taste-Weighted Sampling
         val topArtistNames = profile.topArtists.map { it.artistName.lowercase().trim() }
         val top1Artist = topArtistNames.firstOrNull()
-        val topTrackIds = profile.topTracks.map { it.trackId }.toSet()
+        val topTrackIds = profile.topTracks.filter { it.score > 0 }.map { it.trackId }.toSet()
 
         val weightedPool = validCandidates.map { track ->
             var weight = 1.0 // Base exploration weight for fresh musical discovery
@@ -65,9 +66,9 @@ class SurpriseMeEngineImpl(
             val trackArtist = track.artist.lowercase().trim()
 
             // Top #1 Artist Affinity (+6 weight)
-            if (top1Artist != null && trackArtist.contains(top1Artist)) {
+            if (top1Artist != null && trackArtist == top1Artist) {
                 weight += 6.0
-            } else if (topArtistNames.any { trackArtist.contains(it) }) {
+            } else if (trackArtist in topArtistNames) {
                 // Secondary Top Artist Affinity (+3 weight)
                 weight += 3.0
             }

@@ -22,15 +22,21 @@ class RecommendationEngineImpl : RecommendationEngine {
         candidates: List<Track>,
         excludedTrackIds: Set<String>
     ): List<RecommendationSection> {
-        val validCandidates = candidates.filter { !excludedTrackIds.contains(it.id) }
+        val validCandidates = distinctRecordings(candidates.filter { it.id !in excludedTrackIds })
         val knownTrackIds = (profile.recentTracks.map { it.id } + profile.likedTrackIds).toSet()
 
         // Strict cross-section deduplication registry
         val consumedTrackIds = mutableSetOf<String>()
         val sections = mutableListOf<RecommendationSection>()
 
-        // 1. QUICK PICKS (blends top known tracks + top scoring new candidates)
-        val quickPicks = generateQuickPicks(profile, validCandidates, consumedTrackIds)
+        val recentIds = profile.recentTracks.map { it.id }.toSet()
+        val recommendationPool = validCandidates.filterNot { it.id in recentIds }
+        val topArtist = profile.topArtists.firstOrNull()?.artistName
+        val artistReserve = recommendationPool.filter { it.artist.equals(topArtist, ignoreCase = true) }
+            .takeLast((recommendationPool.size / 10).coerceAtMost(3)).map { it.id }.toSet()
+        val mixPool = recommendationPool.filterNot { it.id in artistReserve }
+
+        val quickPicks = generateQuickPicks(mixPool, consumedTrackIds)
         if (quickPicks.isNotEmpty()) {
             sections.add(
                 RecommendationSection(
@@ -43,7 +49,10 @@ class RecommendationEngineImpl : RecommendationEngine {
         }
 
         // 2. DAILY MIX (Phase B1: Horizontally scrollable mix cards based on user preferences)
-        val mixes = generateDailyMixes(profile, validCandidates, consumedTrackIds)
+        val discoverReserve = mixPool.asReversed().filter {
+            it.id !in knownTrackIds && it.id !in consumedTrackIds
+        }.take((validCandidates.size / 4).coerceAtMost(15)).map { it.id }.toSet()
+        val mixes = generateDailyMixes(profile, mixPool.filter { it.id !in discoverReserve }, consumedTrackIds)
         if (mixes.isNotEmpty()) {
             sections.add(
                 RecommendationSection(
@@ -73,7 +82,7 @@ class RecommendationEngineImpl : RecommendationEngine {
         }
 
         // 4. WEEKLY DISCOVER (Phase B1: Fresh discovery music, strictly excludes Daily Mix and History)
-        val discoverTracks = generateWeeklyDiscover(profile, validCandidates, knownTrackIds, consumedTrackIds)
+        val discoverTracks = generateWeeklyDiscover(profile, recommendationPool, knownTrackIds, consumedTrackIds)
         if (discoverTracks.isNotEmpty()) {
             sections.add(
                 RecommendationSection(
@@ -86,32 +95,19 @@ class RecommendationEngineImpl : RecommendationEngine {
         }
 
         // 5. FURTHER RECOMMENDATIONS (Phase B1: Distinct related music, strictly deduplicated)
-        val furtherSections = generateFurtherRecommendations(profile, validCandidates, consumedTrackIds)
+        val furtherSections = generateFurtherRecommendations(profile, recommendationPool, consumedTrackIds)
         sections.addAll(furtherSections)
 
         return sections
     }
 
     private fun generateQuickPicks(
-        profile: ListeningProfile,
         candidates: List<Track>,
         consumedTrackIds: MutableSet<String>
     ): List<Track> {
-        val picks = mutableListOf<Track>()
-
-        if (!profile.isColdStart) {
-            val topTrackMap = profile.topTracks.associateBy { it.trackId }
-            val known = profile.recentTracks.filter { topTrackMap.containsKey(it.id) }
-            picks.addAll(known.take(3))
-        }
-
-        val needed = (6 - picks.size).coerceAtLeast(2)
-        val available = candidates.filter { it.id !in consumedTrackIds && !picks.any { p -> p.id == it.id } }
-        picks.addAll(available.take(needed))
-
-        val result = diversifyTracks(picks, maxConsecutivePerArtist = 2)
-        consumedTrackIds.addAll(result.map { it.id })
-        return result
+        val picks = diversifyTracks(candidates, maxConsecutivePerArtist = 2).take(6)
+        consumedTrackIds.addAll(picks.map { it.id })
+        return picks
     }
 
     private fun generateDailyMixes(
@@ -125,8 +121,8 @@ class RecommendationEngineImpl : RecommendationEngine {
             // Mix 1: Top Artist #1 Focus + Related Candidates
             val artist1 = profile.topArtists.first().artistName
             val availableForMix1 = candidates.filter { it.id !in consumedTrackIds }
-            val artist1Tracks = availableForMix1.filter { it.artist.contains(artist1, ignoreCase = true) }
-            val otherCandidates = availableForMix1.filter { !it.artist.contains(artist1, ignoreCase = true) }
+            val artist1Tracks = availableForMix1.filter { it.artist.equals(artist1, ignoreCase = true) }
+            val otherCandidates = availableForMix1.filter { !it.artist.equals(artist1, ignoreCase = true) }
             val mix1Pool = (artist1Tracks.take(6) + otherCandidates.shuffled(Random(101)).take(8))
             val mix1Tracks = diversifyTracks(mix1Pool.distinctBy { it.id }, maxConsecutivePerArtist = 2)
 
@@ -147,8 +143,8 @@ class RecommendationEngineImpl : RecommendationEngine {
             val artist2 = profile.topArtists.getOrNull(1)?.artistName
             if (artist2 != null) {
                 val availableForMix2 = candidates.filter { it.id !in consumedTrackIds }
-                val artist2Tracks = availableForMix2.filter { it.artist.contains(artist2, ignoreCase = true) }
-                val remaining = availableForMix2.filter { !it.artist.contains(artist2, ignoreCase = true) }
+                val artist2Tracks = availableForMix2.filter { it.artist.equals(artist2, ignoreCase = true) }
+                val remaining = availableForMix2.filter { !it.artist.equals(artist2, ignoreCase = true) }
                 val mix2Pool = (artist2Tracks.take(6) + remaining.shuffled(Random(202)).take(8))
                 val mix2Tracks = diversifyTracks(mix2Pool.distinctBy { it.id }, maxConsecutivePerArtist = 2)
 
@@ -228,7 +224,7 @@ class RecommendationEngineImpl : RecommendationEngine {
         val freshDiscoveryPool = candidates.filter { candidate ->
             !consumedTrackIds.contains(candidate.id) &&
             !knownTrackIds.contains(candidate.id) &&
-            (topArtist == null || !candidate.artist.contains(topArtist, ignoreCase = true))
+            (topArtist == null || !candidate.artist.equals(topArtist, ignoreCase = true))
         }
 
         val diversified = diversifyTracks(freshDiscoveryPool, maxConsecutivePerArtist = 2).take(15)
@@ -247,7 +243,7 @@ class RecommendationEngineImpl : RecommendationEngine {
         if (profile.topArtists.isNotEmpty()) {
             val topArtist = profile.topArtists.first().artistName
             val artistTracks = candidates
-                .filter { it.id !in consumedTrackIds && it.artist.contains(topArtist, ignoreCase = true) }
+                .filter { it.id !in consumedTrackIds && it.artist.equals(topArtist, ignoreCase = true) }
                 .take(12)
 
             if (artistTracks.isNotEmpty()) {
@@ -270,7 +266,7 @@ class RecommendationEngineImpl : RecommendationEngine {
             if (extraTracks.size >= 4) {
                 sections.add(
                     RecommendationSection(
-                        type = SectionType.QUICK_PICKS,
+                        type = SectionType.EXPLORE_MORE,
                         title = "Explore More",
                         subtitle = "Selected from your preferred genres",
                         tracks = extraTracks
@@ -288,17 +284,16 @@ class RecommendationEngineImpl : RecommendationEngine {
      * from the same artist in any recommended sequence.
      */
     fun diversifyTracks(tracks: List<Track>, maxConsecutivePerArtist: Int = 2): List<Track> {
-        if (tracks.size <= 2) return tracks
+        if (tracks.size <= 1) return tracks
 
         val result = mutableListOf<Track>()
         val pending = tracks.toMutableList()
 
         while (pending.isNotEmpty()) {
             val lastArtist = result.lastOrNull()?.artist?.lowercase()?.trim()
-            val secondLastArtist = if (result.size >= 2) result[result.size - 2].artist.lowercase().trim() else null
-
-            val isBlocked = lastArtist != null && secondLastArtist != null &&
-                    lastArtist == secondLastArtist
+            val limit = maxConsecutivePerArtist.coerceAtLeast(1)
+            val isBlocked = result.size >= limit && result.takeLast(limit)
+                .all { it.artist.lowercase().trim() == lastArtist }
 
             val candidateIndex = if (isBlocked) {
                 pending.indexOfFirst { it.artist.lowercase().trim() != lastArtist }

@@ -119,7 +119,7 @@ fun HomeScreen(
     if (!isOnboardingCompleted) {
         RecommendationOnboardingDialog(
             onDismiss = {
-                viewModel.completeOnboarding(setOf("English", "Hindi"), setOf("Pop", "Rock", "Chill"), "Familiar")
+                viewModel.completeOnboarding(emptySet(), setOf("Pop", "Rock", "Chill"), "Familiar")
             },
             onSavePreferences = { langs, genres, mode ->
                 viewModel.completeOnboarding(langs, genres, mode)
@@ -167,7 +167,7 @@ fun HomeScreen(
                     }
                 }
 
-                state.errorMessage != null && state.sections.isEmpty() -> {
+                state.sections.isEmpty() -> {
                     Box(
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center
@@ -177,7 +177,7 @@ fun HomeScreen(
                             modifier = Modifier.padding(24.dp)
                         ) {
                             Text(
-                                text = state.errorMessage ?: "Could not load music feed",
+                                text = state.errorMessage ?: "No matching recommendations yet. Check your music preferences or try again.",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = colors.error
                             )
@@ -200,7 +200,7 @@ fun HomeScreen(
                     ) {
                         items(state.sections, key = { "${it.type.name}_${it.title}" }) { section ->
                             when (section.type) {
-                                SectionType.QUICK_PICKS -> {
+                                SectionType.QUICK_PICKS, SectionType.EXPLORE_MORE -> {
                                     QuickPicksSection(
                                         section = section,
                                         currentlyPlayingId = state.currentlyPlayingTrackId,

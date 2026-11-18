@@ -490,6 +490,7 @@ class InnerTubeXExtractor(
                 ?: return null
 
             // Artist, Album, Duration
+            var isSpokenWord = false
             var artist = "Unknown Artist"
             var album: String? = null
             var durationSeconds = 0L
@@ -508,6 +509,11 @@ class InnerTubeXExtractor(
                     }
                 }
 
+                val mediaLabel = textParts.firstOrNull()
+                isSpokenWord = mediaLabel in setOf("Episode", "Podcast")
+                if (mediaLabel in setOf("Song", "Video", "Episode", "Podcast")) {
+                    textParts.removeAt(0)
+                }
                 if (textParts.isNotEmpty()) {
                     artist = textParts[0]
                 }
@@ -539,7 +545,8 @@ class InnerTubeXExtractor(
                 artist = artist,
                 album = album,
                 durationSeconds = durationSeconds,
-                thumbnailUrl = thumbUrl
+                thumbnailUrl = thumbUrl,
+                isSpokenWord = isSpokenWord
             )
         } catch (_: Exception) {
             return null

@@ -153,17 +153,14 @@ class LibraryViewModel(
 
     fun playTrack(track: Track) {
         playerController.playTrack(track)
-        recordPlay(track, "library_direct")
     }
 
     fun playTracks(tracks: List<Track>, startIndex: Int = 0, shuffle: Boolean = false) {
         if (tracks.isEmpty()) return
         playerController.setQueue(tracks, startIndex)
-        if (shuffle) {
+        if (shuffle && !playerController.queueSnapshot.value.isShuffle) {
             playerController.toggleShuffle()
         }
-        val target = tracks.getOrNull(startIndex) ?: tracks[0]
-        recordPlay(target, "library_playlist")
     }
 
     fun playNext(track: Track) {
@@ -174,15 +171,4 @@ class LibraryViewModel(
         playerController.addToQueue(track)
     }
 
-    private fun recordPlay(track: Track, context: String) {
-        viewModelScope.launch {
-            historyRepository.recordPlayback(
-                track = track,
-                durationMs = 5000L,
-                totalDurationMs = track.durationSeconds * 1000L,
-                isSkipped = false,
-                playbackContext = context
-            )
-        }
-    }
 }

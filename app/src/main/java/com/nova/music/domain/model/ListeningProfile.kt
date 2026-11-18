@@ -24,7 +24,9 @@ data class ListeningProfile(
     val likedTrackIds: Set<String> = emptySet(),
     val recentTracks: List<Track> = emptyList(),
     val totalListens: Int = 0,
-    val totalSkips: Int = 0
+    val totalSkips: Int = 0,
+    val lastListenAt: Long = 0L,
+    val likedTracks: List<Track> = emptyList()
 ) {
     val isColdStart: Boolean
         get() = totalListens < 3 && likedTrackIds.isEmpty()

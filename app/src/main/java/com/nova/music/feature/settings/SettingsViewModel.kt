@@ -134,8 +134,7 @@ class SettingsViewModel(
     fun clearCache() {
         viewModelScope.launch {
             try {
-                context.cacheDir.deleteRecursively()
-                context.cacheDir.mkdirs()
+                coil.Coil.imageLoader(context).diskCache?.clear()
                 homeRepository?.clearCache()
             } catch (_: Exception) {}
         }
@@ -143,10 +142,7 @@ class SettingsViewModel(
 
     fun saveRecommendationPreferences(languages: Set<String>, genres: Set<String>, discoveryMode: String) {
         viewModelScope.launch {
-            preferencesRepository.setPreferredLanguages(languages)
-            preferencesRepository.setPreferredGenres(genres)
-            preferencesRepository.setDiscoveryMode(discoveryMode)
-            preferencesRepository.setOnboardingCompleted(true)
+            preferencesRepository.saveRecommendationPreferences(languages, genres, discoveryMode)
         }
     }
 

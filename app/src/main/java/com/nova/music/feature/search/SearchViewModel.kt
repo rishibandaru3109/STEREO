@@ -50,7 +50,7 @@ class SearchViewModel(
     }
 
     fun onQueryChange(newQuery: String) {
-        _uiState.update { it.copy(query = newQuery) }
+        _uiState.update { it.copy(query = newQuery, isRefreshing = false) }
         searchJob?.cancel()
         if (newQuery.isBlank()) {
             _uiState.update { it.copy(searchUiState = SearchUiState.Idle) }
@@ -68,7 +68,8 @@ class SearchViewModel(
         searchJob?.cancel()
         val q = _uiState.value.query.trim()
         if (q.isNotEmpty()) {
-            viewModelScope.launch {
+            searchJob = viewModelScope.launch {
+                _uiState.update { it.copy(isRefreshing = false) }
                 executeSearch(q)
             }
         }
@@ -96,8 +97,9 @@ class SearchViewModel(
     fun refresh() {
         if (_uiState.value.isRefreshing) return
         val q = _uiState.value.query.trim()
+        searchJob?.cancel()
         if (q.isNotEmpty()) {
-            viewModelScope.launch {
+            searchJob = viewModelScope.launch {
                 _uiState.update { it.copy(isRefreshing = true) }
                 musicRepository.search(q).collect { result ->
                     result.onSuccess { tracks ->
@@ -118,7 +120,7 @@ class SearchViewModel(
                 }
             }
         } else {
-            viewModelScope.launch {
+            searchJob = viewModelScope.launch {
                 _uiState.update { it.copy(isRefreshing = true) }
                 delay(600)
                 _uiState.update { it.copy(isRefreshing = false) }
@@ -131,7 +133,8 @@ class SearchViewModel(
         if (currentState is SearchUiState.Success) {
             val tracks = currentState.tracks
             val index = tracks.indexOf(track)
-            playerController.setQueue(tracks, if (index >= 0) index else 0)
+            if (index >= 0) playerController.setQueue(tracks, index)
+            else playerController.playTrack(track)
         } else {
             playerController.playTrack(track)
         }

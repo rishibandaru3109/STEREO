@@ -6,7 +6,8 @@ enum class SectionType {
     MADE_FOR_YOU,
     DISCOVER_WEEKLY,
     ON_REPEAT,
-    BECAUSE_YOU_LISTENED
+    BECAUSE_YOU_LISTENED,
+    EXPLORE_MORE
 }
 
 data class RecommendationMix(

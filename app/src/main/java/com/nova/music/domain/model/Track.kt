@@ -7,7 +7,9 @@ data class Track(
     val album: String? = null,
     val durationSeconds: Long = 0,
     val thumbnailUrl: String = "",
-    val streamUrl: String? = null
+    val streamUrl: String? = null,
+    val lyricsLanguage: String? = null,
+    val isSpokenWord: Boolean = false
 ) {
     val durationFormatted: String
         get() {

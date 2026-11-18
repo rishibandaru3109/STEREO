@@ -17,6 +17,8 @@ object TrackJsonSerializer {
             obj.put("durationSeconds", track.durationSeconds)
             obj.put("thumbnailUrl", track.thumbnailUrl)
             obj.put("streamUrl", track.streamUrl ?: "")
+            obj.put("lyricsLanguage", track.lyricsLanguage ?: "")
+            obj.put("isSpokenWord", track.isSpokenWord)
             array.put(obj)
         }
         return array.toString()
@@ -37,7 +39,9 @@ object TrackJsonSerializer {
                         album = obj.optString("album").takeIf { it.isNotBlank() },
                         durationSeconds = obj.optLong("durationSeconds", 0L),
                         thumbnailUrl = obj.optString("thumbnailUrl"),
-                        streamUrl = obj.optString("streamUrl").takeIf { it.isNotBlank() }
+                        streamUrl = obj.optString("streamUrl").takeIf { it.isNotBlank() },
+                        lyricsLanguage = obj.optString("lyricsLanguage").takeIf { it.isNotBlank() },
+                        isSpokenWord = obj.optBoolean("isSpokenWord")
                     )
                 )
             }

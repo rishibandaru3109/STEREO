@@ -3,12 +3,12 @@ package com.nova.music.playback
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.SystemClock
 import android.util.Log
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
-import androidx.media3.common.util.Util
 import androidx.media3.datasource.HttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.analytics.AnalyticsListener
@@ -19,8 +19,11 @@ import com.nova.music.domain.model.PlayerStatus
 import com.nova.music.domain.model.RepeatMode
 import com.nova.music.domain.model.Track
 import com.nova.music.domain.repository.MusicRepository
+import com.nova.music.domain.repository.HistoryRepository
+import com.nova.music.domain.repository.MusicPreferencesRepository
 import com.nova.music.playback.queue.QueueManager
 import com.nova.music.playback.queue.QueueSnapshot
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -28,6 +31,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -37,11 +41,36 @@ class ExoPlayerController(
     private val context: Context,
     private val musicRepository: MusicRepository,
     private val exoPlayer: ExoPlayer,
-    private val queueManager: QueueManager = QueueManager()
+    private val queueManager: QueueManager = QueueManager(),
+    private val historyRepository: HistoryRepository? = null,
+    private val preferencesRepository: MusicPreferencesRepository? = null
 ) : NovaPlayerController {
 
     private val scope = CoroutineScope(Dispatchers.Main + Job())
     private var progressJob: Job? = null
+    private var resolveJob: Job? = null
+    private var playbackRequest = 0L
+    private var playWhenResolved = true
+    private var listeningSession: ListeningSession? = null
+
+    private fun finishListening(manuallySkipped: Boolean = false) {
+        val session = listeningSession ?: return
+        listeningSession = null
+        val sample = session.finish(SystemClock.elapsedRealtime(), exoPlayer.duration, manuallySkipped) ?: return
+        scope.launch {
+            try {
+                if (preferencesRepository?.isHistoryEnabled?.first() != false) {
+                    historyRepository?.recordPlayback(
+                        sample.track, sample.listenedMs, sample.durationMs, sample.isSkipped, "player"
+                    )
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                Log.w("NOVA_DIAGNOSTICS", "Could not save listening history", error)
+            }
+        }
+    }
 
     private val _playbackState = MutableStateFlow(PlaybackState())
     override val playbackState: StateFlow<PlaybackState> = _playbackState.asStateFlow()
@@ -64,15 +93,17 @@ class ExoPlayerController(
                 }
                 Player.STATE_ENDED -> {
                     _playbackState.update { it.copy(status = PlayerStatus.ENDED, isPlaying = false) }
+                    finishListening()
                     handleTrackEnded()
                 }
                 Player.STATE_IDLE -> {
-                    _playbackState.update { it.copy(status = PlayerStatus.IDLE) }
+                    _playbackState.update { if (it.status == PlayerStatus.ERROR) it else it.copy(status = PlayerStatus.IDLE) }
                 }
             }
         }
 
         override fun onIsPlayingChanged(isPlaying: Boolean) {
+            listeningSession?.updatePlaying(isPlaying, SystemClock.elapsedRealtime())
             _playbackState.update {
                 it.copy(
                     isPlaying = isPlaying,
@@ -160,7 +191,7 @@ class ExoPlayerController(
     private fun ensureServiceStarted() {
         try {
             val intent = Intent(context, NovaMediaSessionService::class.java)
-            Util.startForegroundService(context, intent)
+            context.startService(intent)
         } catch (_: Exception) {
             // Foreground service launch handled gracefully
         }
@@ -189,7 +220,7 @@ class ExoPlayerController(
                 currentPositionMs = 0L
             )
         }
-        queueManager.setQueue(tracks, startIndex, isShuffle = _playbackState.value.isShuffle)
+        queueManager.setQueue(tracks, startIndex, isShuffle = queueManager.snapshot.value.isShuffle)
         queueManager.getCurrentTrack()?.let { resolveAndPlay(it) }
     }
 
@@ -225,30 +256,29 @@ class ExoPlayerController(
         return queueManager.undo()
     }
 
-    private fun resolveAndPlay(track: Track) {
-        val requestStartTime = System.currentTimeMillis()
-        scope.launch {
-            if (track.streamUrl != null) {
-                Log.i("NOVA_DIAGNOSTICS", "Playing cached stream URL for track: ${track.id}")
-                playMediaUri(track, track.streamUrl)
-            } else {
-                _playbackState.update { it.copy(status = PlayerStatus.BUFFERING) }
-                val streamResult = musicRepository.resolveStream(track.id)
-                val extractionDuration = System.currentTimeMillis() - requestStartTime
-                streamResult.onSuccess { stream ->
-                    val host = runCatching { Uri.parse(stream.url).host }.getOrNull() ?: "unknown"
-                    Log.i("NOVA_DIAGNOSTICS", "Stream resolved in ${extractionDuration}ms: host=$host, codec=${stream.codec}, bitrate=${stream.bitrate}")
-                    val playStart = System.currentTimeMillis()
-                    playMediaUri(track, stream.url)
-                    val timeBetweenExtractionAndPlay = System.currentTimeMillis() - playStart
-                    Log.i("NOVA_DIAGNOSTICS", "Playback request dispatched to ExoPlayer in ${timeBetweenExtractionAndPlay}ms")
-                }.onFailure { error ->
-                    Log.e("NOVA_DIAGNOSTICS", "Stream resolution failed in ${extractionDuration}ms: ${error.message}")
+    private fun resolveAndPlay(track: Track, manuallySkipped: Boolean = false) {
+        finishListening(manuallySkipped)
+        resolveJob?.cancel()
+        val request = ++playbackRequest
+        playWhenResolved = true
+        exoPlayer.pause()
+        _playbackState.update {
+            it.copy(status = PlayerStatus.BUFFERING, isPlaying = false, errorMessage = null,
+                currentPositionMs = 0L, durationMs = 0L, bufferedPositionMs = 0L)
+        }
+
+        resolveJob = scope.launch {
+            try {
+                val url = track.streamUrl ?: musicRepository.resolveStream(track.id).getOrThrow().url
+                if (request == playbackRequest) playMediaUri(track, url)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                if (request == playbackRequest) {
+                    Log.e("NOVA_DIAGNOSTICS", "Stream resolution failed", error)
                     _playbackState.update {
-                        it.copy(
-                            status = PlayerStatus.ERROR,
-                            errorMessage = "Stream resolution failed: ${error.localizedMessage}"
-                        )
+                        it.copy(status = PlayerStatus.ERROR,
+                            errorMessage = error.localizedMessage ?: "Could not load this track")
                     }
                 }
             }
@@ -269,29 +299,37 @@ class ExoPlayerController(
             .setMediaMetadata(mediaMetadata)
             .build()
 
+        listeningSession = ListeningSession(track)
         exoPlayer.setMediaItem(mediaItem)
         exoPlayer.prepare()
-        exoPlayer.playWhenReady = true
+        exoPlayer.playWhenReady = playWhenResolved
     }
 
     override fun play() {
-        if (exoPlayer.playbackState == Player.STATE_IDLE && _playbackState.value.currentTrack != null) {
-            _playbackState.value.currentTrack?.let { resolveAndPlay(it) }
+        playWhenResolved = true
+        if (resolveJob?.isActive == true) return
+        val current = queueManager.getCurrentTrack()
+        if (current != null && (exoPlayer.playbackState == Player.STATE_IDLE ||
+                exoPlayer.currentMediaItem?.mediaId != current.id)
+        ) {
+            ensureServiceStarted()
+            resolveAndPlay(current)
         } else {
+            if (exoPlayer.playbackState == Player.STATE_ENDED) {
+                exoPlayer.seekTo(0L)
+                listeningSession = current?.let(::ListeningSession)
+            }
             exoPlayer.play()
         }
     }
 
     override fun pause() {
+        playWhenResolved = false
         exoPlayer.pause()
     }
 
     override fun togglePlayPause() {
-        if (exoPlayer.isPlaying) {
-            pause()
-        } else {
-            play()
-        }
+        if (exoPlayer.isPlaying || (resolveJob?.isActive == true && playWhenResolved)) pause() else play()
     }
 
     override fun seekTo(positionMs: Long) {
@@ -303,7 +341,7 @@ class ExoPlayerController(
     override fun next() {
         val nextTrack = queueManager.next(_playbackState.value.repeatMode)
         if (nextTrack != null) {
-            resolveAndPlay(nextTrack)
+            resolveAndPlay(nextTrack, manuallySkipped = true)
         }
     }
 
@@ -323,12 +361,12 @@ class ExoPlayerController(
         exoPlayer.repeatMode = when (repeatMode) {
             RepeatMode.OFF -> Player.REPEAT_MODE_OFF
             RepeatMode.ONE -> Player.REPEAT_MODE_ONE
-            RepeatMode.ALL -> Player.REPEAT_MODE_ALL
+            RepeatMode.ALL -> Player.REPEAT_MODE_OFF
         }
     }
 
     override fun toggleShuffle() {
-        val newShuffle = !_playbackState.value.isShuffle
+        val newShuffle = !queueManager.snapshot.value.isShuffle
         queueManager.toggleShuffle(newShuffle)
     }
 
@@ -371,6 +409,8 @@ class ExoPlayerController(
     }
 
     override fun release() {
+        finishListening()
+        resolveJob?.cancel()
         stopProgressUpdates()
         exoPlayer.removeListener(playerListener)
         exoPlayer.release()

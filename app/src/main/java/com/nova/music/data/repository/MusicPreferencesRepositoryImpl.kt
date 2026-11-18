@@ -11,6 +11,7 @@ import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.nova.music.domain.repository.ContentFilterMode
 import com.nova.music.domain.repository.MusicPreferencesRepository
+import com.nova.music.domain.repository.RecommendationPreferences
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
@@ -19,8 +20,10 @@ import java.io.IOException
 val Context.musicPreferencesDataStore: DataStore<Preferences> by preferencesDataStore(name = "stereo_music_preferences")
 
 class MusicPreferencesRepositoryImpl(
-    private val context: Context
+    private val dataStore: DataStore<Preferences>
 ) : MusicPreferencesRepository {
+    constructor(context: Context) : this(context.musicPreferencesDataStore)
+
 
     companion object {
         val KEY_LANGUAGES = stringSetPreferencesKey("pref_languages")
@@ -35,27 +38,51 @@ class MusicPreferencesRepositoryImpl(
         const val DEFAULT_DISCOVERY_MODE = "Familiar"
     }
 
-    override val preferredLanguages: Flow<Set<String>> = context.musicPreferencesDataStore.data
+    override val recommendationPreferences: Flow<RecommendationPreferences> = dataStore.data
+        .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
+        .map {
+            RecommendationPreferences(
+                languages = it[KEY_LANGUAGES].orEmpty(),
+                genres = it[KEY_GENRES] ?: DEFAULT_GENRES,
+                discoveryMode = it[KEY_DISCOVERY_MODE] ?: DEFAULT_DISCOVERY_MODE,
+                contentFilterMode = if (it[KEY_CONTENT_FILTER_MODE] == ContentFilterMode.ALL_CONTENT.name) {
+                    ContentFilterMode.ALL_CONTENT
+                } else {
+                    ContentFilterMode.MUSIC_ONLY
+                }
+            )
+        }
+
+    override suspend fun saveRecommendationPreferences(languages: Set<String>, genres: Set<String>, mode: String) {
+        dataStore.edit {
+            it[KEY_LANGUAGES] = languages
+            it[KEY_GENRES] = genres
+            it[KEY_DISCOVERY_MODE] = mode
+            it[KEY_ONBOARDING_COMPLETED] = true
+        }
+    }
+
+    override val preferredLanguages: Flow<Set<String>> = dataStore.data
         .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
         .map { it[KEY_LANGUAGES] ?: DEFAULT_LANGUAGES }
 
-    override val preferredGenres: Flow<Set<String>> = context.musicPreferencesDataStore.data
+    override val preferredGenres: Flow<Set<String>> = dataStore.data
         .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
         .map { it[KEY_GENRES] ?: DEFAULT_GENRES }
 
-    override val discoveryMode: Flow<String> = context.musicPreferencesDataStore.data
+    override val discoveryMode: Flow<String> = dataStore.data
         .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
         .map { it[KEY_DISCOVERY_MODE] ?: DEFAULT_DISCOVERY_MODE }
 
-    override val isOnboardingCompleted: Flow<Boolean> = context.musicPreferencesDataStore.data
+    override val isOnboardingCompleted: Flow<Boolean> = dataStore.data
         .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
         .map { it[KEY_ONBOARDING_COMPLETED] ?: false }
 
-    override val isHistoryEnabled: Flow<Boolean> = context.musicPreferencesDataStore.data
+    override val isHistoryEnabled: Flow<Boolean> = dataStore.data
         .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
         .map { it[KEY_HISTORY_ENABLED] ?: true }
 
-    override val contentFilterMode: Flow<ContentFilterMode> = context.musicPreferencesDataStore.data
+    override val contentFilterMode: Flow<ContentFilterMode> = dataStore.data
         .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
         .map {
             when (it[KEY_CONTENT_FILTER_MODE]) {
@@ -65,32 +92,32 @@ class MusicPreferencesRepositoryImpl(
         }
 
     override suspend fun setPreferredLanguages(languages: Set<String>) {
-        context.musicPreferencesDataStore.edit { it[KEY_LANGUAGES] = languages }
+        dataStore.edit { it[KEY_LANGUAGES] = languages }
     }
 
     override suspend fun setPreferredGenres(genres: Set<String>) {
-        context.musicPreferencesDataStore.edit { it[KEY_GENRES] = genres }
+        dataStore.edit { it[KEY_GENRES] = genres }
     }
 
     override suspend fun setDiscoveryMode(mode: String) {
-        context.musicPreferencesDataStore.edit { it[KEY_DISCOVERY_MODE] = mode }
+        dataStore.edit { it[KEY_DISCOVERY_MODE] = mode }
     }
 
     override suspend fun setOnboardingCompleted(completed: Boolean) {
-        context.musicPreferencesDataStore.edit { it[KEY_ONBOARDING_COMPLETED] = completed }
+        dataStore.edit { it[KEY_ONBOARDING_COMPLETED] = completed }
     }
 
     override suspend fun setHistoryEnabled(enabled: Boolean) {
-        context.musicPreferencesDataStore.edit { it[KEY_HISTORY_ENABLED] = enabled }
+        dataStore.edit { it[KEY_HISTORY_ENABLED] = enabled }
     }
 
     override suspend fun setContentFilterMode(mode: ContentFilterMode) {
-        context.musicPreferencesDataStore.edit { it[KEY_CONTENT_FILTER_MODE] = mode.name }
+        dataStore.edit { it[KEY_CONTENT_FILTER_MODE] = mode.name }
     }
 
     override suspend fun resetRecommendationPreferences() {
-        context.musicPreferencesDataStore.edit {
-            it[KEY_LANGUAGES] = DEFAULT_LANGUAGES
+        dataStore.edit {
+            it.remove(KEY_LANGUAGES)
             it[KEY_GENRES] = DEFAULT_GENRES
             it[KEY_DISCOVERY_MODE] = DEFAULT_DISCOVERY_MODE
             it[KEY_ONBOARDING_COMPLETED] = false

@@ -23,6 +23,7 @@ import com.nova.music.core.designsystem.wallpaper.WallpaperRepository
 import com.nova.music.data.extractor.InnerTubeXExtractor
 import com.nova.music.data.repository.HistoryRepositoryImpl
 import com.nova.music.data.repository.HomeRepositoryImpl
+import com.nova.music.data.repository.CatalogRecommendationMetadata
 import com.nova.music.data.repository.LikedSongsRepositoryImpl
 import com.nova.music.data.repository.ListeningProfileRepositoryImpl
 import com.nova.music.data.repository.MusicPreferencesRepositoryImpl
@@ -176,7 +177,8 @@ val appModule = module {
     single<CandidateProvider> {
         CatalogCandidateProvider(
             extractor = get(),
-            preferencesRepository = get()
+            preferencesRepository = get(),
+            metadata = CatalogRecommendationMetadata(androidContext(), get())
         )
     }
 
@@ -193,7 +195,8 @@ val appModule = module {
             listeningProfileRepository = get(),
             candidateProvider = get(),
             recommendationEngine = get(),
-            recommendationDao = get()
+            recommendationDao = get(),
+            preferencesRepository = get()
         )
     }
 
@@ -244,7 +247,9 @@ val appModule = module {
             context = androidContext(),
             musicRepository = get(),
             exoPlayer = get(),
-            queueManager = get()
+            queueManager = get(),
+            historyRepository = get(),
+            preferencesRepository = get()
         )
     }
 
@@ -256,8 +261,7 @@ val appModule = module {
             likedSongsRepository = get(),
             preferencesRepository = get(),
             surpriseMeEngine = get(),
-            listeningProfileRepository = get(),
-            candidateProvider = get()
+            listeningProfileRepository = get()
         )
     }
 

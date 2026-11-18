@@ -28,27 +28,30 @@ class ListeningProfileRepositoryImpl(
         val likedIds = likedSongDao.getAllLikedTrackIdsList().toSet()
         val allTrackIds = (rawHistory.map { it.trackId } + likedIds).distinct()
         val trackMap = if (allTrackIds.isNotEmpty()) {
-            trackDao.getTracksByIds(allTrackIds).associateBy { it.id }
+            allTrackIds.chunked(500).flatMap { trackDao.getTracksByIds(it) }.associateBy { it.id }
         } else {
             emptyMap()
         }
 
-        return computeProfile(rawHistory, likedIds, trackMap)
+        val excludedIds = getExcludedTrackIds()
+        return computeProfile(rawHistory.filterNot { it.trackId in excludedIds }, likedIds - excludedIds, trackMap)
     }
 
     override fun observeListeningProfile(): Flow<ListeningProfile> {
         return combine(
             historyDao.getRawHistory(200),
-            likedSongDao.getAllLikedTrackIds()
-        ) { historyList, likedIdList ->
-            val likedIds = likedIdList.toSet()
+            likedSongDao.getAllLikedTrackIds(),
+            recommendationDao.getFeedbackFlow()
+        ) { historyList, likedIdList, feedback ->
+            val excludedIds = feedback.map { it.trackId }.toSet()
+            val likedIds = likedIdList.toSet() - excludedIds
             val allTrackIds = (historyList.map { it.trackId } + likedIds).distinct()
             val trackMap = if (allTrackIds.isNotEmpty()) {
-                trackDao.getTracksByIds(allTrackIds).associateBy { it.id }
+                allTrackIds.chunked(500).flatMap { trackDao.getTracksByIds(it) }.associateBy { it.id }
             } else {
                 emptyMap()
             }
-            computeProfile(historyList, likedIds, trackMap)
+            computeProfile(historyList.filterNot { it.trackId in excludedIds }, likedIds, trackMap)
         }
     }
 
@@ -100,12 +103,12 @@ class ListeningProfileRepositoryImpl(
             val isCompleted = event.completionRatio >= 0.8f || event.listeningDurationMs >= 30_000L
             val isSkipped = event.isSkipped || (event.completionRatio < 0.2f && event.listeningDurationMs < 30_000L)
 
-            if (isCompleted) {
-                stats.completionCount++
-                stats.score += 30.0 * decay
-            } else if (isSkipped) {
+            if (isSkipped) {
                 stats.skipCount++
                 stats.score -= 20.0 * decay
+            } else if (isCompleted) {
+                stats.completionCount++
+                stats.score += 30.0 * decay
             } else {
                 // Partial listen
                 stats.score += 5.0 * decay
@@ -145,8 +148,9 @@ class ListeningProfileRepositoryImpl(
         for (trackAffinity in trackAffinities) {
             if (trackAffinity.artist.isBlank()) continue
             val artist = trackAffinity.artist.trim()
-            val stats = artistStatsMap.getOrPut(artist) { ArtistStats(artist) }
-            stats.score += trackAffinity.score.coerceAtLeast(0.0)
+            val stats = artistStatsMap.getOrPut(artist.lowercase()) { ArtistStats(artist) }
+            stats.score += trackAffinity.score
+            stats.completionCount += trackStatsMap.getValue(trackAffinity.trackId).completionCount
             stats.playCount += trackAffinity.playCount
             if (trackAffinity.lastPlayedAt > stats.lastPlayedAt) {
                 stats.lastPlayedAt = trackAffinity.lastPlayedAt
@@ -161,7 +165,7 @@ class ListeningProfileRepositoryImpl(
                 completionCount = stats.completionCount,
                 lastPlayedAt = stats.lastPlayedAt
             )
-        }.sortedByDescending { it.score }
+        }.filter { it.score > 0 }.sortedByDescending { it.score }
 
         // 5. Recent Tracks list (ordered by last played)
         val recentTracks = historyList
@@ -180,7 +184,10 @@ class ListeningProfileRepositoryImpl(
             likedTrackIds = likedIds,
             recentTracks = recentTracks,
             totalListens = totalListens,
-            totalSkips = totalSkips
+            totalSkips = totalSkips,
+            lastListenAt = historyList.firstOrNull()?.playedAt ?: 0L,
+            likedTracks = trackAffinities.asSequence().filter { it.isLiked }.take(40)
+                .mapNotNull { trackMap[it.trackId]?.toTrack() }.toList()
         )
     }
 }

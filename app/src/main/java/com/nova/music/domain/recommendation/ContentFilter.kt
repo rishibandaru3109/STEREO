@@ -23,6 +23,7 @@ object ContentFilter {
     )
 
     fun isMusicTrack(track: Track): Boolean {
+        if (track.isSpokenWord) return false
         val title = track.title.trim()
         val artist = track.artist.trim()
 
@@ -31,7 +32,7 @@ object ContentFilter {
 
         // 2. Check title for non-music keywords
         val hasNonMusicTitle = NON_MUSIC_TITLE_REGEX.containsMatchIn(title)
-        if (hasNonMusicTitle && !isExplicitMusic) {
+        if (hasNonMusicTitle && (track.album.isNullOrBlank() || !isExplicitMusic)) {
             return false
         }
 
