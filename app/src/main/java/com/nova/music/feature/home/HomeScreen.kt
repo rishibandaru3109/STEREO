@@ -247,12 +247,14 @@ fun HomeScreen(
             )
 
             // Native Theme-aware Material 3 Pull to Refresh Indicator
-            PullToRefreshContainer(
-                state = pullToRefreshState,
-                modifier = Modifier.align(Alignment.TopCenter),
-                containerColor = colors.surfaceElevated,
-                contentColor = colors.primaryAccent
-            )
+            if (pullToRefreshState.isRefreshing || pullToRefreshState.progress > 0f) {
+                PullToRefreshContainer(
+                    state = pullToRefreshState,
+                    modifier = Modifier.align(Alignment.TopCenter),
+                    containerColor = colors.surfaceElevated,
+                    contentColor = colors.primaryAccent
+                )
+            }
         }
     }
 }

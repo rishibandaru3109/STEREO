@@ -27,7 +27,7 @@ class PersonalizedCatalogTest {
                 Track("$trackId-english", "First song", "Artist $trackId", lyricsLanguage = "English"),
                 Track("$trackId-copy", "First Song!", "Artist $trackId", lyricsLanguage = "English"),
                 Track("$trackId-telugu", "Second song", "Artist $trackId", lyricsLanguage = "Telugu"),
-                Track("$trackId-unknown", "Third song", "Artist $trackId"),
+                Track("$trackId-spanish", "Tercera cancion", "Artista $trackId", lyricsLanguage = "Spanish"),
                 Track("$trackId-episode", "Road stories", "Artist $trackId",
                     lyricsLanguage = "English", isSpokenWord = true)
             ))
@@ -64,11 +64,13 @@ class PersonalizedCatalogTest {
     }
 
     @Test
-    fun lyricsPolicyRejectsUnknownAndUnselectedPartsOfMixedLyrics() {
-        val track = Track("1", "A song", "Any artist")
+    fun lyricsPolicyRejectsConfidentlyNonMatchingAndMixedLyrics() {
+        val teluguTrack = Track("1", "\u0C36\u0C4D\u0C30\u0C40\u0C30\u0C3E\u0C2E", "Devotional")
+        val englishTrack = Track("2", "Blinding Lights", "The Weeknd")
         val preferences = RecommendationPreferences(languages = setOf("English"))
-        assertFalse(RecommendationEligibility.accepts(track, preferences))
-        assertFalse(RecommendationEligibility.accepts(track.copy(lyricsLanguage = "English+Spanish"), preferences))
+        assertFalse(RecommendationEligibility.accepts(teluguTrack, preferences))
+        assertTrue(RecommendationEligibility.accepts(englishTrack, preferences))
+        assertFalse(RecommendationEligibility.accepts(englishTrack.copy(lyricsLanguage = "English+Spanish"), preferences))
         assertEquals("English", LyricsLanguage.identify("You and I will be there when they call. This is what we know."))
         assertNull(LyricsLanguage.identify("tum mere saath ho mera dil kya hai nahin mujhe"))
     }

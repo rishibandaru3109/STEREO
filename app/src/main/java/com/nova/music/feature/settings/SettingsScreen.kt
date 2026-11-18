@@ -592,12 +592,24 @@ fun SettingsScreen(
                         Button(
                             onClick = { showOnboardingDialog = true },
                             shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = colors.primaryAccent, contentColor = Color.Black),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = colors.primaryAccent,
+                                contentColor = if (colors.primaryAccent == Color.White) Color.Black else colors.background
+                            ),
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Icon(imageVector = Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Icon(
+                                imageVector = Icons.Default.AutoAwesome,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp),
+                                tint = if (colors.primaryAccent == Color.White) Color.Black else colors.background
+                            )
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text(text = "Tune Taste Preferences", fontWeight = FontWeight.Bold)
+                            Text(
+                                text = "Tune Taste Preferences",
+                                fontWeight = FontWeight.Bold,
+                                color = if (colors.primaryAccent == Color.White) Color.Black else colors.background
+                            )
                         }
 
                         OutlinedButton(

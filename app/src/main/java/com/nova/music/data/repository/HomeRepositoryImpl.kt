@@ -5,6 +5,7 @@ import com.nova.music.core.database.entity.RecommendationCacheEntity
 import com.nova.music.domain.model.RecommendationSection
 import com.nova.music.domain.model.SectionType
 import com.nova.music.domain.recommendation.CandidateProvider
+import com.nova.music.domain.recommendation.ContentFilter
 import com.nova.music.domain.recommendation.RecommendationEligibility
 import com.nova.music.domain.recommendation.RecommendationEngine
 import com.nova.music.domain.recommendation.distinctRecordings
@@ -91,7 +92,7 @@ class HomeRepositoryImpl(
         return recommendationEngine.generateSections(profile, candidates, excluded).mapNotNull { section ->
             if (section.type != SectionType.RECENTLY_PLAYED) return@mapNotNull section
             val recent = section.tracks.map { languageByTrack[it.id] ?: it }
-                .filter { RecommendationEligibility.accepts(it, preferences) }
+                .filter { it.id !in excluded && ContentFilter.isMusicTrack(it) }
             section.copy(tracks = recent).takeIf { recent.isNotEmpty() }
         }
     }

@@ -238,12 +238,14 @@ fun SearchScreen(
                 }
             }
 
-            PullToRefreshContainer(
-                state = pullToRefreshState,
-                modifier = Modifier.align(Alignment.TopCenter),
-                containerColor = colors.surfaceElevated,
-                contentColor = colors.primaryAccent
-            )
+            if (pullToRefreshState.isRefreshing || pullToRefreshState.progress > 0f) {
+                PullToRefreshContainer(
+                    state = pullToRefreshState,
+                    modifier = Modifier.align(Alignment.TopCenter),
+                    containerColor = colors.surfaceElevated,
+                    contentColor = colors.primaryAccent
+                )
+            }
         }
     }
 }

@@ -82,9 +82,16 @@ class CatalogRecommendationMetadata(
     }
 
     private suspend fun fetchLanguage(track: Track): String? {
+        val cleanTitle = track.title
+            .replace(Regex("""(?i)\s*[\(\[\{](?:official|music|video|audio|lyric|remix|hd|4k|visualizer|feat|ft\.).*?[\)\]\}]"""), "")
+            .trim().ifEmpty { track.title }
+        val cleanArtist = track.artist
+            .replace(Regex("""(?i)\s*-\s*Topic"""), "")
+            .trim().ifEmpty { track.artist }
+
         val url = "https://lrclib.net/api/get".toHttpUrl().newBuilder()
-            .addQueryParameter("track_name", track.title)
-            .addQueryParameter("artist_name", track.artist)
+            .addQueryParameter("track_name", cleanTitle)
+            .addQueryParameter("artist_name", cleanArtist)
             .addQueryParameter("duration", track.durationSeconds.toString())
         track.album?.takeIf { it.isNotBlank() }?.let { url.addQueryParameter("album_name", it) }
         lyricsRateLock.withLock {
@@ -96,10 +103,7 @@ class CatalogRecommendationMetadata(
         val body = parse(result)
         if (body == null) return null
         val duration = body.optDouble("duration")
-        if (recordingName(body.optString("trackName")) != recordingName(track.title) ||
-            recordingName(body.optString("artistName")) != recordingName(track.artist) ||
-            !duration.isFinite() || abs(duration - track.durationSeconds) > 2
-        ) return UNKNOWN
+        if (!duration.isFinite() || abs(duration - track.durationSeconds) > 6) return UNKNOWN
         return LyricsLanguage.identify(body.optString("plainLyrics", "")) ?: UNKNOWN
     }
 

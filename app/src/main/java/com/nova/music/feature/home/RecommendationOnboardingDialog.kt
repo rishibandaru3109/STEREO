@@ -263,11 +263,15 @@ fun RecommendationOnboardingDialog(
                         },
                         colors = ButtonDefaults.buttonColors(
                             containerColor = colors.primaryAccent,
-                            contentColor = Color.Black
+                            contentColor = if (colors.primaryAccent == Color.White) Color.Black else colors.background
                         ),
                         shape = RoundedCornerShape(12.dp)
                     ) {
-                        Text(text = "Save & Discover", fontWeight = FontWeight.Bold)
+                        Text(
+                            text = "Save & Discover",
+                            fontWeight = FontWeight.Bold,
+                            color = if (colors.primaryAccent == Color.White) Color.Black else colors.background
+                        )
                     }
                 }
             }

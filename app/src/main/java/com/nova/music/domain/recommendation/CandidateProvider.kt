@@ -95,14 +95,20 @@ class CatalogCandidateProvider(
         val preferred = distinctRecordings(supplement)
             .filter { it.id !in blocked && it.id !in seedIds && ContentFilter.isMusicTrack(it) }
         val local = profile.recentTracks + profile.likedTracks
+        val pool = distinctRecordings(radio.take(35) + preferred.take(35) + local.take(15))
+            .filter { it.id !in blocked && ContentFilter.isMusicTrack(it) }
         val shortlisted = if (preferences.languages.isEmpty()) {
             distinctRecordings(radio + preferred + local)
         } else {
-            val pool = distinctRecordings(radio.take(16) + preferred.take(16) + local.take(8))
-                .filter { it.id !in blocked && ContentFilter.isMusicTrack(it) }
             metadata?.identifyLanguages(pool) ?: pool
         }
         val ranked = shortlisted.filter { it.id !in blocked && RecommendationEligibility.accepts(it, preferences) }
+        try {
+            android.util.Log.w(
+                "STEREO_REC_PROVENANCE",
+                "Provenance: seeds=${seedIds.size}, radio=${radio.size}, supplement=${preferred.size}, pool=${pool.size}, shortlisted=${shortlisted.size}, accepted=${ranked.size}"
+            )
+        } catch (_: Throwable) {}
         rank(ranked, radio.map { it.id }.toSet(), profile, adventurous)
     }
 
@@ -127,7 +133,7 @@ class CatalogCandidateProvider(
     }
 
     private suspend fun <T> source(load: suspend () -> List<T>): List<T> = try {
-        withTimeoutOrNull(5_000L) { load() }.orEmpty()
+        withTimeoutOrNull(10_000L) { load() }.orEmpty()
     } catch (cancelled: CancellationException) {
         throw cancelled
     } catch (_: Exception) {
