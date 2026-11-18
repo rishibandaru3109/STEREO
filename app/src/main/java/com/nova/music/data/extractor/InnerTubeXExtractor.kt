@@ -187,7 +187,7 @@ class InnerTubeXExtractor(
         }
     }
 
-    private fun parsePlayerDetails(trackId: String, jsonStr: String): Track {
+    internal fun parsePlayerDetails(trackId: String, jsonStr: String): Track {
         val root = JSONObject(jsonStr)
         val details = root.optJSONObject("videoDetails") ?: error("No videoDetails in player response")
         val title = details.optString("title", "Unknown Title")
@@ -240,7 +240,7 @@ class InnerTubeXExtractor(
         }
     }
 
-    private fun parseSongRadioResponse(seedTrackId: String, jsonStr: String): List<Track> {
+    internal fun parseSongRadioResponse(seedTrackId: String, jsonStr: String): List<Track> {
         val tracks = mutableListOf<Track>()
         try {
             val root = JSONObject(jsonStr)
@@ -331,7 +331,7 @@ class InnerTubeXExtractor(
         return tracks
     }
 
-    private fun parseBrowseHomeResponse(jsonStr: String): List<Track> {
+    internal fun parseBrowseHomeResponse(jsonStr: String): List<Track> {
         val tracks = mutableListOf<Track>()
         try {
             val root = JSONObject(jsonStr)
@@ -386,7 +386,7 @@ class InnerTubeXExtractor(
         return tracks
     }
 
-    private fun parseMusicSearchResponse(jsonStr: String): List<Track> {
+    internal fun parseMusicSearchResponse(jsonStr: String): List<Track> {
         val tracks = mutableListOf<Track>()
         try {
             val root = JSONObject(jsonStr)
@@ -474,6 +474,9 @@ class InnerTubeXExtractor(
                 ?.optJSONObject("navigationEndpoint")
                 ?.optJSONObject("watchEndpoint")
                 ?.optString("videoId")
+                ?: item.optJSONObject("playlistItemData")
+                    ?.optString("videoId")
+                    ?.ifEmpty { null }
                 ?: item.optJSONObject("doubleTapCommand")
                     ?.optJSONObject("watchEndpoint")
                     ?.optString("videoId")
@@ -553,7 +556,7 @@ class InnerTubeXExtractor(
         }
     }
 
-    private fun parseDurationText(text: String): Long {
+    internal fun parseDurationText(text: String): Long {
         val parts = text.trim().split(":")
         if (parts.size == 2) {
             val min = parts[0].toLongOrNull() ?: 0L

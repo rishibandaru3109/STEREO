@@ -84,6 +84,15 @@ android {
 
     testOptions {
         unitTests.isReturnDefaultValues = true
+        unitTests.all { testTask ->
+            if (project.hasProperty("includeLiveTests") && project.property("includeLiveTests") == "true") {
+                // Run all tests including live network integration tests
+            } else {
+                testTask.useJUnit {
+                    excludeCategories("com.nova.music.testing.LiveNetworkTest")
+                }
+            }
+        }
     }
 
     packaging {
@@ -161,4 +170,15 @@ dependencies {
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20240303")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
+}
+
+tasks.register<Test>("testLiveIntegration") {
+    description = "Runs live network integration tests against real third-party endpoints."
+    group = "verification"
+    val testTask = tasks.named<Test>("testDebugUnitTest")
+    testClassesDirs = testTask.get().testClassesDirs
+    classpath = testTask.get().classpath
+    useJUnit {
+        includeCategories("com.nova.music.testing.LiveNetworkTest")
+    }
 }

@@ -97,7 +97,7 @@ class YouTubeMusicExtractor(
         }
     }
 
-    private fun parseMusicSearchResponse(jsonStr: String): List<Track> {
+    internal fun parseMusicSearchResponse(jsonStr: String): List<Track> {
         val tracks = mutableListOf<Track>()
         try {
             val root = JSONObject(jsonStr)
@@ -242,6 +242,18 @@ class YouTubeMusicExtractor(
                 ?.optString("text") ?: ""
             durationSeconds = parseDurationToSeconds(durText)
         }
+        if (durationSeconds == 0L && flexColumns.length() > 1) {
+            val col1Runs = flexColumns.optJSONObject(1)
+                ?.optJSONObject("musicResponsiveListItemFlexColumnRenderer")
+                ?.optJSONObject("text")
+                ?.optJSONArray("runs")
+            if (col1Runs != null && col1Runs.length() > 0) {
+                val lastText = col1Runs.optJSONObject(col1Runs.length() - 1)?.optString("text")?.trim() ?: ""
+                if (lastText.contains(":")) {
+                    durationSeconds = parseDurationToSeconds(lastText)
+                }
+            }
+        }
 
         // 4. Thumbnail
         val thumbnails = item.optJSONObject("thumbnail")
@@ -292,13 +304,17 @@ class YouTubeMusicExtractor(
         }
     }
 
-    private fun parseAndroidSearchResponse(jsonStr: String): List<Track> {
+    internal fun parseAndroidSearchResponse(jsonStr: String): List<Track> {
         val tracks = mutableListOf<Track>()
         try {
             val root = JSONObject(jsonStr)
-            val contents = root.optJSONObject("contents")
-                ?.optJSONObject("sectionListRenderer")
-                ?.optJSONArray("contents") ?: return emptyList()
+            val contentsObj = root.optJSONObject("contents")
+            val contents = contentsObj?.optJSONObject("sectionListRenderer")?.optJSONArray("contents")
+                ?: contentsObj?.optJSONObject("twoColumnSearchResultsRenderer")
+                    ?.optJSONObject("primaryContents")
+                    ?.optJSONObject("sectionListRenderer")
+                    ?.optJSONArray("contents")
+                ?: return emptyList()
 
             for (i in 0 until contents.length()) {
                 val itemSection = contents.optJSONObject(i)?.optJSONObject("itemSectionRenderer") ?: continue
@@ -592,7 +608,7 @@ class YouTubeMusicExtractor(
         )
     }
 
-    private fun parseDurationToSeconds(text: String): Long {
+    internal fun parseDurationToSeconds(text: String): Long {
         if (text.isEmpty()) return 0L
         val parts = text.split(":")
         return when (parts.size) {
