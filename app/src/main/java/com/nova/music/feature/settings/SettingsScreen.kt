@@ -576,7 +576,12 @@ fun SettingsScreen(
                     Spacer(modifier = Modifier.height(8.dp))
 
                     SettingsDetailCard {
-                        SettingsInfoRow(title = "Preferred Languages", value = preferredLanguages.joinToString())
+                        val displayLanguages = when {
+                            preferredLanguages.isEmpty() -> "None (Global Discovery)"
+                            preferredLanguages.size > 3 -> "${preferredLanguages.take(3).joinToString()}, +${preferredLanguages.size - 3} more"
+                            else -> preferredLanguages.joinToString()
+                        }
+                        SettingsInfoRow(title = "Preferred Languages", value = displayLanguages)
                         SettingsInfoRow(title = "Preferred Genres", value = preferredGenres.joinToString())
                         SettingsInfoRow(title = "Recommendation Sources", value = "YouTube Music Home Shelves + Song Radio")
                         SettingsInfoRow(title = "Taste Signal Weights", value = "Skip (-20), Listen 30s+ (+30), Like (+30)")

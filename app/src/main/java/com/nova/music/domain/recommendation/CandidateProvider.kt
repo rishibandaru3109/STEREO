@@ -63,8 +63,11 @@ class CatalogCandidateProvider(
         val needDiscovery = radio.size < 22 || adventurous || preferences.languages.isNotEmpty()
         val supplement = if (needDiscovery) {
             val genre = preferences.genres.sorted().firstOrNull()
-            val queries = preferences.languages.sorted().take(2).map { language ->
-                listOfNotNull(language, genre, "songs").joinToString(" ")
+            val resolvedLangs = com.nova.music.domain.model.StereoLanguages.normalize(preferences.languages)
+                .ifEmpty { preferences.languages }
+            val queries = resolvedLangs.sorted().take(3).map { language ->
+                val keyword = com.nova.music.domain.model.StereoLanguages.resolve(language)?.searchKeyword ?: "$language songs"
+                if (genre != null) "$language $genre songs" else keyword
             }.ifEmpty {
                 when {
                     topArtists.isNotEmpty() -> listOf(topArtists.first().artistName + " songs")
@@ -102,11 +105,17 @@ class CatalogCandidateProvider(
         } else {
             metadata?.identifyLanguages(pool) ?: pool
         }
-        val ranked = shortlisted.filter { it.id !in blocked && RecommendationEligibility.accepts(it, preferences) }
+        var ranked = shortlisted.filter { it.id !in blocked && RecommendationEligibility.accepts(it, preferences) }
+        var isFallback = false
+        if (ranked.isEmpty() && pool.isNotEmpty()) {
+            // Safe fallback: prevent empty Home feed if strict language filters left 0 candidates
+            ranked = pool.filter { it.id !in blocked }
+            isFallback = true
+        }
         try {
             android.util.Log.w(
                 "STEREO_REC_PROVENANCE",
-                "Provenance: seeds=${seedIds.size}, radio=${radio.size}, supplement=${preferred.size}, pool=${pool.size}, shortlisted=${shortlisted.size}, accepted=${ranked.size}"
+                "Provenance: seeds=${seedIds.size}, radio=${radio.size}, supplement=${preferred.size}, pool=${pool.size}, shortlisted=${shortlisted.size}, accepted=${ranked.size}, fallback=$isFallback"
             )
         } catch (_: Throwable) {}
         rank(ranked, radio.map { it.id }.toSet(), profile, adventurous)
