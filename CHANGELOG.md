@@ -5,6 +5,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [1.0.0-beta.1] - 2026-11-23
+
+### Added
+- **Automatic Audio Caching:** Progressive Media3 `SimpleCache` pipeline automatically caching audio streams in app storage (`no_backup/automatic_audio_v2`), eliminating redundant network data on track replay.
+- **Offline Validated Playback:** Seamless playback for fully cached songs without active network connectivity.
+- **SYNAPSE Personalized Recommendation Engine:** Autonomous dual-horizon recommendation engine tracking listening duration, completion ratios, contextual skips, and explicit likes.
+- **Dynamic Recommendation Shelves:** Quick Picks, Daily Mixes, Weekly Discover, and "Because You Listened To [Artist]" rails powered by Maximal Marginal Relevance (MMR) diversity reranking.
+- **Discovery Calibration (MMR):** User-adjustable exploration slider in Settings featuring Adventurous (0.2), Balanced (0.65), and Familiar (0.9) anchors.
+- **Scroll-Aware Surprise Me FAB:** Dynamic floating action button that auto-collapses to a compact 48.dp circular icon button during list scrolling and smoothly expands on idle.
+- **Room Migration 2 to 3:** Automated SQLite schema upgrade creating `synapse_listening_events` and `synapse_taste_profile` tables with performance indices.
+
+### Changed
+- **Typography & Shelf Ergonomics:** Card titles wrap cleanly across 2 lines with 16.sp/18.sp line heights and fixed minimum line counts for uniform carousel height.
+- **Bottom Content Clearance:** Extended bottom content padding (160.dp / 230.dp with mini-player) ensuring all bottom tracks and menus clear system navigation bars.
+- **Confidence-Weighted Skip Penalties:** Accidental single skips ($N=1$) no longer banish entire artist catalogs; artist-level penalties now require repeated skips ($N \ge 2$) and recover on subsequent listens or likes.
+- **Dynamic Version Reflection:** Settings About screen dynamically reflects `BuildConfig.VERSION_NAME` and `BuildConfig.VERSION_CODE`.
+
+### Compatibility
+- Signed with the identical permanent production RSA 4096-bit certificate as Alpha.4 and Alpha.5 (`7E:38:21:4D:3F:83:E4:FD:CC:1B:03:50:32:85:19:41:83:92:DB:E4:F6:B2:F1:AC:5F:B2:BD:03:96:D6:C0:64`).
+- **Seamless Upgrade:** Existing Alpha.4 and Alpha.5 users can update directly without uninstalling or resetting user data.
+
+---
+
 ## [1.0.0-alpha.5] - 2026-11-19
 
 ### Added

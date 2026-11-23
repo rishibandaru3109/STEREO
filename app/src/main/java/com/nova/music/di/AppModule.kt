@@ -74,7 +74,7 @@ import org.koin.dsl.module
 import java.util.concurrent.TimeUnit
 
 val appModule = module {
-    single { AudioCacheEngine(androidContext(), personalBuild = BuildConfig.DEBUG) }
+    single { AudioCacheEngine(androidContext(), personalBuild = true) }
     single(createdAtStart = true) { AudioPrefetcher(get(), get(), get(), get<NetworkMonitor>().state, get(named("audioUpstream"))) }
     single { NetworkMonitor(androidContext()) }
 

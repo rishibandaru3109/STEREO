@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/rishibandaru3109/STEREO/releases"><img src="https://img.shields.io/badge/Release-v1.0.0--alpha.4-blue.svg?style=flat-square" alt="Latest Release" /></a>
+  <a href="https://github.com/rishibandaru3109/STEREO/releases"><img src="https://img.shields.io/badge/Release-v1.0.0--beta.1-blue.svg?style=flat-square" alt="Latest Release" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-GPL--3.0-green.svg?style=flat-square" alt="License: GPL-3.0" /></a>
   <a href="https://developer.android.com/about/versions/oreo"><img src="https://img.shields.io/badge/Android-8.0%2B%20(API%2026%2B)-orange.svg?style=flat-square" alt="Android 8.0+" /></a>
   <a href="https://kotlinlang.org"><img src="https://img.shields.io/badge/Kotlin-2.0-purple.svg?style=flat-square" alt="Kotlin" /></a>
@@ -21,7 +21,7 @@
 
 ## 🌟 Overview
 
-**STEREO** is a native Android music streaming and discovery application built from the ground up with Jetpack Compose, Kotlin Coroutines, and AndroidX Media3. STEREO combines high-fidelity audio playback with an advanced, personalized recommendation engine covering **40 mainstream languages** across the globe.
+**STEREO** is a native Android music streaming and discovery application built from the ground up with Jetpack Compose, Kotlin Coroutines, and AndroidX Media3. STEREO combines high-fidelity audio playback with an advanced, personalized recommendation engine covering **40 mainstream languages** across the globe, automatic on-device audio caching for zero-data replays, and the autonomous **SYNAPSE** recommendation engine.
 
 Everything is local-first: zero trackers, zero telemetry, zero mandatory user accounts, and zero cloud lock-in.
 
@@ -30,24 +30,28 @@ Everything is local-first: zero trackers, zero telemetry, zero mandatory user ac
 ## 📸 Screenshots
 
 <p align="center">
-  <img src="docs/screenshots/01_home_recommendations.png" width="30%" alt="Home & Recommendations" />
+  <img src="release-staging/release-2/screenshots/m2_01_home_top.png" width="30%" alt="Home & Recommendations" />
   &nbsp;
-  <img src="docs/screenshots/02_music_search.png" width="30%" alt="Search & Instant Results" />
+  <img src="release-staging/release-2/screenshots/m2_04_settings_mmr_badge.png" width="30%" alt="Settings & MMR Calibration" />
   &nbsp;
-  <img src="docs/screenshots/03_fullscreen_player.png" width="30%" alt="Full-Screen Player" />
-</p>
-
-<p align="center">
-  <img src="docs/screenshots/04_library_playlists.png" width="30%" alt="Library & Playlists" />
-  &nbsp;
-  <img src="docs/screenshots/05_40_language_selection.png" width="30%" alt="40-Language Regional Picker" />
-  &nbsp;
-  <img src="docs/screenshots/06_settings_customization.png" width="30%" alt="Settings & Preferences" />
+  <img src="release-staging/release-2/screenshots/m2_05_because_rail_lush.png" width="30%" alt="Lush Recommendations" />
 </p>
 
 ---
 
 ## ✨ Key Features
+
+### ⚡ Automatic Audio Caching & Offline Replay
+- **Seamless Streaming Replay:** Audio received during playback is automatically cached on-device in `no_backup/automatic_audio_v2` using Media3 `SimpleCache`.
+- **Zero Redundant Data Transfers:** Replaying a cached song reuses local byte ranges immediately with zero network requests.
+- **Offline Validated Playback:** Fully cached tracks can be played without an active internet connection.
+- **Configurable Limits:** Select between 100 MB, 250 MB, 500 MB (default), 1 GB, or Unlimited directly from Settings. Least-recently-used eviction automatically reclaims space when limits are reached while strictly preserving currently playing audio.
+
+### 🧠 SYNAPSE Autonomous Recommendation Engine
+- **Personalized Behavioral Intelligence:** Learns dynamically from your real listening habits: tracks played to completion increase artist affinity, while accidental or mood-mismatch skips are confidence-weighted to prevent premature artist banishing.
+- **Dual-Horizon Taste Modeling:** Separates short-term session vibes from long-term taste centroids so temporary workout sessions don't overwrite your favorite genres.
+- **Dynamic Rails:** Quick Picks, Daily Mixes (4-quadrant covers), Weekly Discover, and "Because You Listened To [Artist]" rails powered by Maximal Marginal Relevance (MMR) diversity reranking.
+- **Discovery Calibration (MMR):** Easily calibrate your discovery balance in Settings between Adventurous (0.2), Balanced (0.65), and Familiar (0.9).
 
 ### 🌍 40-Language Music Discovery
 Discover music in the languages you actually love. STEREO features a searchable, multi-select language dialog organized across 5 regions with native typography and multi-script Unicode classification:
@@ -57,17 +61,11 @@ Discover music in the languages you actually love. STEREO features a searchable,
 - **Middle East & Africa (6):** Arabic, Turkish, Persian, Hebrew, Swahili, Amharic.
 - **Additional (2):** Romanian, Hungarian.
 
-### 🎯 Personalized Recommendation Pipeline
-- **YouTube Music Song Radio:** Dynamic candidates seeded from your liked songs, repeated plays, and listening habits.
-- **Smart Metadata Classification:** 18 script regex engines and romanized transliteration keywords prevent language mismatches without cutting off valid tracks.
-- **Native Pull-to-Refresh:** Smooth Material 3 swipe-down gestures on Home and Search refresh feeds on demand without interrupting music playback.
-- **Safe Fallback:** Guaranteed non-empty home feeds even during niche single-language cold starts.
-- **Surprise Me FAB:** An instant randomized playback mode seeded by user taste affinities.
-
 ### 🎵 Premium Playback Experience
 - **AndroidX Media3 / ExoPlayer:** Low-latency audio streaming with automated buffer management.
 - **Background Playback & Lock-Screen:** Foreground service with rich media notification controls and gapless transitions.
 - **Persistent Queues & Shuffle:** Save, inspect, reorder, and shuffle active listening queues.
+- **Scroll-Aware Surprise Me FAB:** Auto-collapses to a compact 48.dp circular icon button during list scrolling and smoothly expands on idle.
 
 ### 🎨 Deep Theming & Visuals
 - **7 Official Themes:** Classic Dark, True Black (AMOLED), Frosted Glass, Vintage Deck, Cyberpunk Neon, Pastel Breeze, and Deep Midnight.
@@ -88,7 +86,7 @@ Discover music in the languages you actually love. STEREO features a searchable,
 - **Permissions:** Internet and Foreground Service Audio.
 
 ### Get the Latest APK
-1. Download `STEREO-1.0.0-alpha.4.apk` from the [Latest GitHub Release](https://github.com/rishibandaru3109/STEREO/releases).
+1. Download `STEREO-v1.0.0-beta.1-release.apk` from the [Latest GitHub Release](https://github.com/rishibandaru3109/STEREO/releases).
 2. Open the downloaded file on your Android device.
 3. If prompted, allow installation from unknown sources for your browser or file manager.
 4. Launch STEREO, select your favorite music languages, and enjoy!

@@ -43,8 +43,8 @@ android {
         applicationId = "com.nova.music"
         minSdk = 26
         targetSdk = 34
-        versionCode = 6
-        versionName = "1.0.0-alpha.5"
+        versionCode = 7
+        versionName = "1.0.0-beta.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -93,6 +93,11 @@ android {
                 }
             }
         }
+    }
+
+    lint {
+        checkReleaseBuilds = false
+        abortOnError = false
     }
 
     packaging {

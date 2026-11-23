@@ -251,7 +251,7 @@ fun SettingsScreen(
 
                     SettingsCategoryCard(
                         title = "About",
-                        subtitle = "STEREO v2.1.0 Master ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¢ Zero paid APIs ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¢ Open Source",
+                        subtitle = "STEREO v${BuildConfig.VERSION_NAME} • Zero paid APIs • Open Source",
                         icon = Icons.Default.Info,
                         onClick = { currentDestination = SettingsDestination.ABOUT }
                     )
@@ -958,11 +958,10 @@ fun SettingsScreen(
                             else if (cacheLimitMb == 0) "Disabled" else formatCacheBytes(cacheStats.maxBytes))
                         SettingsInfoRow("Completely cached songs", cacheStats.completeSongs.toString())
                         SettingsInfoRow("Partially cached songs", cacheStats.partialSongs.toString())
-                        if (BuildConfig.DEBUG) SettingsInfoRow("Full replay hits / misses", "${cacheStats.hits} / ${cacheStats.misses}")
+                        SettingsInfoRow("Full replay hits / misses", "${cacheStats.hits} / ${cacheStats.misses}")
                     }
                     Text(
-                        if (BuildConfig.DEBUG) "Audio received during playback is kept for replay. Only validated complete songs play offline."
-                        else "Stores audio from providers that permit caching.",
+                        "Audio received during playback is automatically cached for replay. Validated complete songs play offline.",
                         style = MaterialTheme.typography.bodySmall.copy(color = colors.textSecondary)
                     )
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1088,12 +1087,12 @@ fun SettingsScreen(
 
                     SettingsDetailCard {
                         SettingsInfoRow(title = "Application", value = "STEREO")
-                        SettingsInfoRow(title = "Release", value = "v2.1.0 Master Release")
-                        SettingsInfoRow(title = "Package", value = "com.nova.music")
+                        SettingsInfoRow(title = "Release", value = "v${BuildConfig.VERSION_NAME} (Build ${BuildConfig.VERSION_CODE})")
+                        SettingsInfoRow(title = "Package", value = BuildConfig.APPLICATION_ID)
                         SettingsInfoRow(title = "Platform", value = "Native Android (Kotlin + Jetpack Compose)")
                         SettingsInfoRow(title = "Architecture", value = "Clean MVVM + Media3 ExoPlayer + Koin DI")
                         SettingsInfoRow(title = "License", value = "Open Source (₹0 Budget, Zero Paid APIs)")
-                        SettingsInfoRow(title = "Audio Engine", value = "InnerTubeX audio extractor")
+                        SettingsInfoRow(title = "Audio Engine", value = "InnerTubeX audio extractor + Media3 Cache")
                     }
 
                     Spacer(modifier = Modifier.height(80.dp))
