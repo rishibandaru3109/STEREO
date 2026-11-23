@@ -103,6 +103,9 @@ android {
 }
 
 dependencies {
+    // SYNAPSE Recommendation Engine (Independent Module via Composite Build)
+    implementation("com.synapse.recommendation:synapse:1.0.0")
+
     // AndroidX & Core
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.2")

@@ -1,6 +1,13 @@
 package com.nova.music.di
 
 import android.util.Log
+import com.nova.music.BuildConfig
+import com.nova.music.core.cache.AudioPrefetcher
+import org.koin.core.qualifier.named
+import com.nova.music.core.cache.AudioCacheEngine
+import com.nova.music.core.network.NetworkMonitor
+import com.nova.music.core.network.TrafficMeter
+import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.datasource.DataSource
@@ -15,6 +22,7 @@ import com.nova.music.core.database.dao.LikedSongDao
 import com.nova.music.core.database.dao.PlaylistDao
 import com.nova.music.core.database.dao.QueueDao
 import com.nova.music.core.database.dao.RecommendationDao
+import com.nova.music.core.database.dao.SynapseDao
 import com.nova.music.core.database.dao.TrackDao
 import com.nova.music.core.designsystem.theme.ThemePreferencesRepository
 import com.nova.music.core.designsystem.theme.ThemeRepository
@@ -34,6 +42,9 @@ import com.nova.music.domain.recommendation.CandidateProvider
 import com.nova.music.domain.recommendation.CatalogCandidateProvider
 import com.nova.music.domain.recommendation.RecommendationEngine
 import com.nova.music.domain.recommendation.RecommendationEngineImpl
+import com.nova.music.domain.recommendation.SynapseRecommendationEngineBridge
+import com.synapse.recommendation.engine.SynapseRecommendationEngine
+import com.synapse.recommendation.taste.TasteIntelligence
 import com.nova.music.domain.recommendation.SurpriseMeEngine
 import com.nova.music.domain.recommendation.SurpriseMeEngineImpl
 import com.nova.music.domain.repository.HistoryRepository
@@ -63,6 +74,10 @@ import org.koin.dsl.module
 import java.util.concurrent.TimeUnit
 
 val appModule = module {
+    single { AudioCacheEngine(androidContext(), personalBuild = BuildConfig.DEBUG) }
+    single(createdAtStart = true) { AudioPrefetcher(get(), get(), get(), get<NetworkMonitor>().state, get(named("audioUpstream"))) }
+    single { NetworkMonitor(androidContext()) }
+
     // Network: OkHttpClient with safe diagnostic logging for streaming traffic
     single {
         val logging = HttpLoggingInterceptor().apply {
@@ -97,6 +112,7 @@ val appModule = module {
         }
 
         OkHttpClient.Builder()
+            .addNetworkInterceptor(TrafficMeter.interceptor)
             .addInterceptor(logging)
             .addInterceptor(gvsLoggingInterceptor)
             .connectTimeout(15, TimeUnit.SECONDS)
@@ -115,7 +131,7 @@ val appModule = module {
 
     // Repository
     single<MusicRepository> {
-        MusicRepositoryImpl(extractor = get(), preferencesRepository = get())
+        MusicRepositoryImpl(extractor = get(), preferencesRepository = get(), networkState = get<NetworkMonitor>().state, audioCache = get())
     }
 
     // Room Database & DAOs with Migration(1, 2)
@@ -125,7 +141,7 @@ val appModule = module {
             StereoDatabase::class.java,
             "stereo_database.db"
         )
-            .addMigrations(StereoDatabase.MIGRATION_1_2)
+            .addMigrations(StereoDatabase.MIGRATION_1_2, StereoDatabase.MIGRATION_2_3)
             .build()
     }
     single<TrackDao> { get<StereoDatabase>().trackDao() }
@@ -134,6 +150,7 @@ val appModule = module {
     single<HistoryDao> { get<StereoDatabase>().historyDao() }
     single<QueueDao> { get<StereoDatabase>().queueDao() }
     single<RecommendationDao> { get<StereoDatabase>().recommendationDao() }
+    single<SynapseDao> { get<StereoDatabase>().synapseDao() }
 
     // Liked Songs Repository
     single<LikedSongsRepository> {
@@ -182,8 +199,21 @@ val appModule = module {
         )
     }
 
+    // SYNAPSE Autonomous Recommendation Engine
+    single<TasteIntelligence> { TasteIntelligence() }
+    single<SynapseRecommendationEngine> {
+        SynapseRecommendationEngine(
+            candidateProvider = com.synapse.recommendation.candidate.InMemoryCandidateProvider(emptyList()),
+            tasteIntelligence = get()
+        )
+    }
+
     single<RecommendationEngine> {
-        RecommendationEngineImpl()
+        SynapseRecommendationEngineBridge(
+            synapseEngine = get(),
+            preferencesRepository = get(),
+            legacyEngine = RecommendationEngineImpl()
+        )
     }
 
     single<SurpriseMeEngine> {
@@ -206,7 +236,7 @@ val appModule = module {
     }
 
     // Media3 Data Source Factory with Web Remix headers
-    single<DataSource.Factory> {
+    single<DataSource.Factory>(named("audioUpstream")) {
         val okHttpClient: OkHttpClient = get()
         val defaultHeaders = mapOf(
             "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
@@ -218,6 +248,7 @@ val appModule = module {
             .setDefaultRequestProperties(defaultHeaders)
         DefaultDataSource.Factory(androidContext(), httpDataSourceFactory)
     }
+    single<DataSource.Factory> { get<AudioCacheEngine>().factory(get(named("audioUpstream"))) }
 
     // Media3 ExoPlayer Engine (shared singleton configured with OkHttp and Web Remix headers)
     single<ExoPlayer> {
@@ -227,6 +258,13 @@ val appModule = module {
 
         ExoPlayer.Builder(androidContext())
             .setMediaSourceFactory(mediaSourceFactory)
+            .setLoadControl(
+                DefaultLoadControl.Builder()
+                    .setBufferDurationsMs(5_000, 15_000, 1_000, 2_500)
+                    .setPrioritizeTimeOverSizeThresholds(true)
+                    .setBackBuffer(0, false)
+                    .build()
+            )
             .setAudioAttributes(
                 AudioAttributes.Builder()
                     .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
@@ -249,7 +287,10 @@ val appModule = module {
             exoPlayer = get(),
             queueManager = get(),
             historyRepository = get(),
-            preferencesRepository = get()
+            preferencesRepository = get(),
+            audioCache = get(),
+            synapseEngine = get(),
+            synapseDao = get()
         )
     }
 
@@ -318,7 +359,8 @@ val appModule = module {
             preferencesRepository = get(),
             historyRepository = get(),
             context = androidContext(),
-            homeRepository = get()
+            homeRepository = get(),
+            audioCache = get()
         )
     }
 }

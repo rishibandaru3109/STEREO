@@ -23,3 +23,5 @@ dependencyResolutionManagement {
 
 rootProject.name = "NOVA Music"
 include(":app")
+includeBuild("../Synapse")
+

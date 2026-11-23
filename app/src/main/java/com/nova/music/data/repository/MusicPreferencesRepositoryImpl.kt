@@ -1,11 +1,13 @@
 package com.nova.music.data.repository
 
 import android.content.Context
+import com.nova.music.domain.model.AudioQualityMode
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
+import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -26,16 +28,27 @@ class MusicPreferencesRepositoryImpl(
 
 
     companion object {
+        val KEY_AUDIO_QUALITY = stringPreferencesKey("audio_quality_mode")
         val KEY_LANGUAGES = stringSetPreferencesKey("pref_languages")
         val KEY_GENRES = stringSetPreferencesKey("pref_genres")
         val KEY_DISCOVERY_MODE = stringPreferencesKey("pref_discovery_mode")
         val KEY_ONBOARDING_COMPLETED = booleanPreferencesKey("pref_onboarding_completed")
         val KEY_HISTORY_ENABLED = booleanPreferencesKey("pref_history_enabled")
         val KEY_CONTENT_FILTER_MODE = stringPreferencesKey("pref_content_filter_mode")
+        val KEY_SYNAPSE_ENABLED = booleanPreferencesKey("synapse_recommender_enabled")
+        val KEY_SYNAPSE_DISCOVERY_ALPHA = floatPreferencesKey("synapse_discovery_alpha")
 
         val DEFAULT_LANGUAGES = setOf("English", "Hindi")
         val DEFAULT_GENRES = setOf("Pop", "Rock", "Hip-Hop", "Chill")
         const val DEFAULT_DISCOVERY_MODE = "Familiar"
+    }
+
+    override val audioQualityMode: Flow<AudioQualityMode> = dataStore.data
+        .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
+        .map { AudioQualityMode.fromStored(it[KEY_AUDIO_QUALITY]) }
+
+    override suspend fun setAudioQualityMode(mode: AudioQualityMode) {
+        dataStore.edit { it[KEY_AUDIO_QUALITY] = mode.name }
     }
 
     override val recommendationPreferences: Flow<RecommendationPreferences> = dataStore.data
@@ -122,5 +135,21 @@ class MusicPreferencesRepositoryImpl(
             it[KEY_DISCOVERY_MODE] = DEFAULT_DISCOVERY_MODE
             it[KEY_ONBOARDING_COMPLETED] = false
         }
+    }
+
+    override val isSynapseEnabled: Flow<Boolean> = dataStore.data
+        .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
+        .map { it[KEY_SYNAPSE_ENABLED] ?: true }
+
+    override suspend fun setSynapseEnabled(enabled: Boolean) {
+        dataStore.edit { it[KEY_SYNAPSE_ENABLED] = enabled }
+    }
+
+    override val synapseDiscoveryAlpha: Flow<Float> = dataStore.data
+        .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
+        .map { it[KEY_SYNAPSE_DISCOVERY_ALPHA] ?: 0.65f }
+
+    override suspend fun setSynapseDiscoveryAlpha(alpha: Float) {
+        dataStore.edit { it[KEY_SYNAPSE_DISCOVERY_ALPHA] = alpha.coerceIn(0.15f, 0.95f) }
     }
 }
