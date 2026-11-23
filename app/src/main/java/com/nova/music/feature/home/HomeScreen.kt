@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -193,9 +194,13 @@ fun HomeScreen(
                 }
 
                 else -> {
+                    val listState = rememberLazyListState()
+                    val isFabExpanded = !listState.isScrollInProgress
+
                     LazyColumn(
+                        state = listState,
                         modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(bottom = 140.dp),
+                        contentPadding = PaddingValues(bottom = if (state.currentlyPlayingTrackId != null) 230.dp else 160.dp),
                         verticalArrangement = Arrangement.spacedBy(24.dp)
                     ) {
                         items(state.sections, key = { "${it.type.name}_${it.title}" }) { section ->
@@ -231,20 +236,21 @@ fun HomeScreen(
                             }
                         }
                     }
+
+                    // Surprise Me Floating Action Button (Theme-aware, collapsable on scroll, generous clearance above mini-player)
+                    SurpriseMeFab(
+                        isLoading = state.isSurpriseMeLoading,
+                        isExpanded = isFabExpanded,
+                        onClick = { viewModel.triggerSurpriseMe() },
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(
+                                end = 16.dp,
+                                bottom = if (state.currentlyPlayingTrackId != null) 156.dp else 88.dp
+                            )
+                    )
                 }
             }
-
-            // Surprise Me Floating Action Button (Theme-aware, positioned above mini-player)
-            SurpriseMeFab(
-                isLoading = state.isSurpriseMeLoading,
-                onClick = { viewModel.triggerSurpriseMe() },
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(
-                        end = 16.dp,
-                        bottom = if (state.currentlyPlayingTrackId != null) 156.dp else 84.dp
-                    )
-            )
 
             // Native Theme-aware Material 3 Pull to Refresh Indicator
             if (pullToRefreshState.isRefreshing || pullToRefreshState.progress > 0f) {
@@ -262,39 +268,43 @@ fun HomeScreen(
 @Composable
 private fun SurpriseMeFab(
     isLoading: Boolean,
+    isExpanded: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val colors = StereoTheme.colors
     ExtendedFloatingActionButton(
+        expanded = isExpanded,
         onClick = { if (!isLoading) onClick() },
+        icon = {
+            if (isLoading) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(20.dp),
+                    color = colors.background,
+                    strokeWidth = 2.dp
+                )
+            } else {
+                Icon(
+                    painter = painterResource(id = R.drawable.ic_dice_surprise),
+                    contentDescription = "Surprise me",
+                    modifier = Modifier.size(20.dp),
+                    tint = colors.background
+                )
+            }
+        },
+        text = {
+            Text(
+                text = "Surprise me",
+                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+                color = colors.background
+            )
+        },
         shape = RoundedCornerShape(24.dp),
         containerColor = colors.primaryAccent,
         contentColor = colors.background,
         elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 6.dp),
         modifier = modifier
-    ) {
-        if (isLoading) {
-            CircularProgressIndicator(
-                modifier = Modifier.size(20.dp),
-                color = colors.background,
-                strokeWidth = 2.dp
-            )
-        } else {
-            Icon(
-                painter = painterResource(id = R.drawable.ic_dice_surprise),
-                contentDescription = "Surprise me",
-                modifier = Modifier.size(20.dp),
-                tint = colors.background
-            )
-        }
-        Spacer(modifier = Modifier.width(8.dp))
-        Text(
-            text = "Surprise me",
-            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
-            color = colors.background
-        )
-    }
+    )
 }
 
 @Composable
@@ -319,7 +329,7 @@ private fun QuickPicksSection(
             items(pairs) { columnPair ->
                 Column(
                     verticalArrangement = Arrangement.spacedBy(10.dp),
-                    modifier = Modifier.width(280.dp)
+                    modifier = Modifier.width(304.dp)
                 ) {
                     columnPair.forEach { track ->
                         QuickPickItem(
@@ -408,11 +418,13 @@ private fun QuickPickItem(
                     text = track.title,
                     style = MaterialTheme.typography.bodyMedium.copy(
                         fontWeight = if (isPlaying) FontWeight.Bold else FontWeight.Medium,
-                        color = if (isPlaying) colors.primaryAccent else colors.textPrimary
+                        color = if (isPlaying) colors.primaryAccent else colors.textPrimary,
+                        lineHeight = 18.sp
                     ),
-                    maxLines = 1,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
+                Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = track.artist,
                     style = MaterialTheme.typography.bodySmall.copy(color = colors.textSecondary),
@@ -606,9 +618,11 @@ private fun MixCard(
             Text(
                 text = mix.subtitle,
                 style = MaterialTheme.typography.bodySmall.copy(
-                    color = colors.textSecondary
+                    color = colors.textSecondary,
+                    lineHeight = 16.sp
                 ),
-                maxLines = 1,
+                maxLines = 2,
+                minLines = 2,
                 overflow = TextOverflow.Ellipsis
             )
         }
@@ -660,7 +674,7 @@ private fun TrackCard(
     var menuExpanded by remember { mutableStateOf(false) }
 
     StereoCard(
-        modifier = Modifier.width(136.dp),
+        modifier = Modifier.width(152.dp),
         shape = RoundedCornerShape(14.dp),
         onClick = onClick
     ) {
@@ -717,11 +731,14 @@ private fun TrackCard(
                         text = track.title,
                         style = MaterialTheme.typography.bodySmall.copy(
                             fontWeight = if (isPlaying) FontWeight.Bold else FontWeight.Medium,
-                            color = if (isPlaying) colors.primaryAccent else colors.textPrimary
+                            color = if (isPlaying) colors.primaryAccent else colors.textPrimary,
+                            lineHeight = 16.sp
                         ),
-                        maxLines = 1,
+                        maxLines = 2,
+                        minLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
+                    Spacer(modifier = Modifier.height(2.dp))
                     Text(
                         text = track.artist,
                         style = MaterialTheme.typography.labelSmall.copy(color = colors.textSecondary),

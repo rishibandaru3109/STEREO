@@ -43,8 +43,8 @@ android {
         applicationId = "com.nova.music"
         minSdk = 26
         targetSdk = 34
-        versionCode = 6
-        versionName = "1.0.0-alpha.5"
+        versionCode = 7
+        versionName = "1.0.0-beta.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -95,6 +95,12 @@ android {
         }
     }
 
+    lint {
+        checkReleaseBuilds = true
+        abortOnError = true
+        disable += "UnsafeOptInUsageError"
+    }
+
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
@@ -103,6 +109,9 @@ android {
 }
 
 dependencies {
+    // SYNAPSE Recommendation Engine (Independent Module)
+    implementation(project(":Synapse"))
+
     // AndroidX & Core
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.2")

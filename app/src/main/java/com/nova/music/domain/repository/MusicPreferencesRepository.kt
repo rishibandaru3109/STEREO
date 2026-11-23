@@ -1,5 +1,7 @@
 package com.nova.music.domain.repository
 
+import com.nova.music.domain.model.AudioQualityMode
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 
@@ -16,6 +18,9 @@ data class RecommendationPreferences(
 )
 
 interface MusicPreferencesRepository {
+    val audioQualityMode: Flow<AudioQualityMode> get() = flowOf(AudioQualityMode.AUTO)
+    suspend fun setAudioQualityMode(mode: AudioQualityMode) {}
+
     val recommendationPreferences: Flow<RecommendationPreferences>
         get() = combine(preferredLanguages, preferredGenres, discoveryMode, contentFilterMode, isOnboardingCompleted) {
                 languages, genres, mode, filter, configured ->
@@ -43,4 +48,11 @@ interface MusicPreferencesRepository {
     suspend fun setHistoryEnabled(enabled: Boolean)
     suspend fun setContentFilterMode(mode: ContentFilterMode)
     suspend fun resetRecommendationPreferences()
+
+    // SYNAPSE Autonomous Recommendation Engine Preferences
+    val isSynapseEnabled: Flow<Boolean> get() = flowOf(true)
+    suspend fun setSynapseEnabled(enabled: Boolean) {}
+
+    val synapseDiscoveryAlpha: Flow<Float> get() = flowOf(0.65f)
+    suspend fun setSynapseDiscoveryAlpha(alpha: Float) {}
 }

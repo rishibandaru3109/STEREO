@@ -1,6 +1,10 @@
 package com.nova.music.feature.settings
 
 import android.widget.Toast
+import androidx.compose.runtime.LaunchedEffect
+import com.nova.music.core.cache.AudioCacheLimits
+import com.nova.music.domain.model.AudioQualityMode
+import com.nova.music.BuildConfig
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -55,6 +59,7 @@ import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -96,6 +101,14 @@ fun SettingsScreen(
     onBackClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val qualityMode by viewModel.audioQualityMode.collectAsStateWithLifecycle()
+    val traffic by viewModel.traffic.collectAsStateWithLifecycle()
+    val cacheStats by viewModel.audioCacheStats.collectAsStateWithLifecycle()
+    val cacheEnabled by viewModel.audioCacheEnabled.collectAsStateWithLifecycle()
+    val prefetchEnabled by viewModel.audioPrefetchEnabled.collectAsStateWithLifecycle()
+    val cacheLimitMb by viewModel.audioCacheLimitMb.collectAsStateWithLifecycle()
+    val artworkBytes by viewModel.artworkBytes.collectAsStateWithLifecycle()
+    val storageMessage by viewModel.storageMessage.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val colors = StereoTheme.colors
     var currentDestination by remember { mutableStateOf(SettingsDestination.MAIN) }
@@ -106,6 +119,8 @@ fun SettingsScreen(
     val wallpaperConfig by viewModel.wallpaperConfig.collectAsStateWithLifecycle()
     val preferredLanguages by viewModel.preferredLanguages.collectAsStateWithLifecycle()
     val preferredGenres by viewModel.preferredGenres.collectAsStateWithLifecycle()
+    val isSynapseEnabled by viewModel.isSynapseEnabled.collectAsStateWithLifecycle()
+    val synapseDiscoveryAlpha by viewModel.synapseDiscoveryAlpha.collectAsStateWithLifecycle()
     val isHistoryEnabled by viewModel.isHistoryEnabled.collectAsStateWithLifecycle()
     val contentFilterMode by viewModel.contentFilterMode.collectAsStateWithLifecycle()
 
@@ -194,7 +209,7 @@ fun SettingsScreen(
 
                     SettingsCategoryCard(
                         title = "Audio & Playback",
-                        subtitle = "InnerTubeX lossless streaming, 48kHz 32-bit PCM",
+                        subtitle = "Audio quality, Data Saver, and network usage",
                         icon = Icons.Default.GraphicEq,
                         onClick = { currentDestination = SettingsDestination.AUDIO_PLAYBACK }
                     )
@@ -236,7 +251,7 @@ fun SettingsScreen(
 
                     SettingsCategoryCard(
                         title = "About",
-                        subtitle = "STEREO v2.1.0 Master • Zero paid APIs • Open Source",
+                        subtitle = "STEREO v${BuildConfig.VERSION_NAME} • Zero paid APIs • Open Source",
                         icon = Icons.Default.Info,
                         onClick = { currentDestination = SettingsDestination.ABOUT }
                     )
@@ -548,17 +563,48 @@ fun SettingsScreen(
                         .verticalScroll(rememberScrollState())
                         .padding(horizontal = 16.dp, vertical = 8.dp)
                 ) {
+                    SettingsSectionTitle("Audio quality")
+                    AudioQualityMode.entries.forEach { mode ->
+                        SettingsCategoryCard(
+                            title = (if (qualityMode == mode) "ÃƒÂ¢Ã…â€œÃ¢â‚¬Å“ " else "") + mode.label,
+                            subtitle = mode.description,
+                            icon = if (qualityMode == mode) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
+                            onClick = { viewModel.setAudioQualityMode(mode) }
+                        )
+                    }
+                    Text(
+                        text = "Auto adapts to connection costs. Quality changes resume the current song at its playback position. Available formats vary by song.",
+                        style = MaterialTheme.typography.bodySmall.copy(color = colors.textSecondary)
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    if (BuildConfig.DEBUG) {
+                        SettingsSectionTitle("Network usage this process")
+                        SettingsDetailCard {
+                            SettingsInfoRow("Audio received", traffic.audioBytes.toString() + " bytes")
+                            SettingsInfoRow("Artwork received", traffic.artworkBytes.toString() + " bytes")
+                            SettingsInfoRow("API received", traffic.apiBytes.toString() + " bytes")
+                            SettingsInfoRow("Network requests", traffic.requests.toString())
+                            SettingsInfoRow("Metadata cache hits", traffic.metadataCacheHits.toString())
+                            SettingsInfoRow("Artwork cache hits", traffic.artworkCacheHits.toString())
+                        }
+                        OutlinedButton(onClick = { viewModel.sampleTraffic() }) { Text("Sample traffic") }
+                        Text(
+                            text = "Counts HTTP response payload bytes read, including retries. Headers, TLS, DNS, and socket overhead are excluded.",
+                            style = MaterialTheme.typography.bodySmall.copy(color = colors.textSecondary)
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                    }
                     SettingsSectionTitle("Streaming & Playback Engine")
                     Spacer(modifier = Modifier.height(8.dp))
 
                     SettingsDetailCard {
-                        SettingsInfoRow(title = "Streaming Engine", value = "InnerTubeX Lossless + YouTube Music Fallback")
-                        SettingsInfoRow(title = "Output Sample Rate", value = "48000 Hz, 32-bit Float / PCM")
-                        SettingsInfoRow(title = "Audio Pipeline", value = "Bit-perfect AudioTrack via Media3 ExoPlayer")
+                        SettingsInfoRow(title = "Streaming Engine", value = "InnerTubeX + YouTube Music fallback")
+                        SettingsInfoRow(title = "Stream Quality", value = "Selected from available source formats")
+                        SettingsInfoRow(title = "Audio Pipeline", value = "Media3 ExoPlayer")
                         SettingsInfoRow(title = "Audio Focus Handling", value = "Automatic ducking / pause on phone calls")
                         SettingsInfoRow(title = "Headphone Disconnect", value = "Auto-pause on unplug / Bluetooth disconnect")
                         SettingsInfoRow(title = "Shuffle Algorithm", value = "Balanced Fisher-Yates (Artist Diversity)")
-                        SettingsInfoRow(title = "Decoder Buffer", value = "2.5 MB Low-latency Ring Buffer")
+                        SettingsInfoRow(title = "Forward Buffer", value = "5ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“15 seconds")
                     }
 
                     Spacer(modifier = Modifier.height(80.dp))
@@ -572,6 +618,144 @@ fun SettingsScreen(
                         .verticalScroll(rememberScrollState())
                         .padding(horizontal = 16.dp, vertical = 8.dp)
                 ) {
+                    SettingsSectionTitle("SYNAPSE Autonomous Engine")
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    SettingsDetailCard {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "SYNAPSE Recommendation Engine",
+                                    style = MaterialTheme.typography.bodyMedium.copy(
+                                        color = colors.textPrimary,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                )
+                                Text(
+                                    text = "Adaptive AI engine with contextual skip learning, duration clamping, and MMR diversity re-ranking",
+                                    style = MaterialTheme.typography.bodySmall.copy(color = colors.textSecondary)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Switch(
+                                checked = isSynapseEnabled,
+                                onCheckedChange = { viewModel.setSynapseEnabled(it) },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = colors.primaryAccent,
+                                    checkedTrackColor = colors.surfaceHighlight
+                                )
+                            )
+                        }
+
+                        if (isSynapseEnabled) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(0.5.dp)
+                                    .background(colors.divider)
+                            )
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 12.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "Discovery Calibration (MMR)",
+                                        style = MaterialTheme.typography.bodyMedium.copy(
+                                            color = colors.textPrimary,
+                                            fontWeight = FontWeight.SemiBold
+                                        ),
+                                        modifier = Modifier.weight(1f, fill = false)
+                                    )
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .background(colors.primaryAccent.copy(alpha = 0.15f))
+                                            .padding(horizontal = 10.dp, vertical = 4.dp)
+                                    ) {
+                                        Text(
+                                            text = if (synapseDiscoveryAlpha > 0.70f) "Familiar (70%)" else if (synapseDiscoveryAlpha < 0.45f) "Adventurous (35%)" else "Balanced (65%)",
+                                            style = MaterialTheme.typography.labelMedium.copy(
+                                                color = colors.primaryAccent,
+                                                fontWeight = FontWeight.Bold
+                                            ),
+                                            maxLines = 1,
+                                            softWrap = false
+                                        )
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "Balances familiar favorites against exploratory long-tail music",
+                                    style = MaterialTheme.typography.bodySmall.copy(color = colors.textSecondary)
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Slider(
+                                    value = synapseDiscoveryAlpha,
+                                    onValueChange = { viewModel.setSynapseDiscoveryAlpha(it) },
+                                    valueRange = 0.20f..0.90f,
+                                    colors = SliderDefaults.colors(
+                                        thumbColor = colors.primaryAccent,
+                                        activeTrackColor = colors.primaryAccent,
+                                        inactiveTrackColor = colors.surfaceHighlight
+                                    )
+                                )
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "Adventurous (0.2)",
+                                        style = MaterialTheme.typography.labelSmall.copy(
+                                            fontSize = 9.5.sp,
+                                            color = colors.textSecondary
+                                        ),
+                                        modifier = Modifier.weight(1.25f),
+                                        textAlign = TextAlign.Start,
+                                        maxLines = 1,
+                                        softWrap = false
+                                    )
+                                    Text(
+                                        text = "Balanced (0.65)",
+                                        style = MaterialTheme.typography.labelSmall.copy(
+                                            fontSize = 9.5.sp,
+                                            color = colors.textSecondary
+                                        ),
+                                        modifier = Modifier.weight(1.1f),
+                                        textAlign = TextAlign.Center,
+                                        maxLines = 1,
+                                        softWrap = false
+                                    )
+                                    Text(
+                                        text = "Familiar (0.9)",
+                                        style = MaterialTheme.typography.labelSmall.copy(
+                                            fontSize = 9.5.sp,
+                                            color = colors.textSecondary
+                                        ),
+                                        modifier = Modifier.weight(1.0f),
+                                        textAlign = TextAlign.End,
+                                        maxLines = 1,
+                                        softWrap = false
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
                     SettingsSectionTitle("Taste Profile & Signals")
                     Spacer(modifier = Modifier.height(8.dp))
 
@@ -757,36 +941,65 @@ fun SettingsScreen(
             }
 
             SettingsDestination.STORAGE_CACHE -> {
+                LaunchedEffect(Unit) { viewModel.refreshStorage() }
                 Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .verticalScroll(rememberScrollState())
+                    modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())
                         .padding(horizontal = 16.dp, vertical = 8.dp)
                 ) {
-                    SettingsSectionTitle("Temporary Files & Cache")
-                    Spacer(modifier = Modifier.height(8.dp))
-
+                    SettingsSectionTitle("Audio cache")
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("Automatic audio caching", color = colors.textPrimary)
+                        Switch(checked = cacheEnabled, onCheckedChange = viewModel::setAudioCaching)
+                    }
                     SettingsDetailCard {
-                        SettingsInfoRow(title = "Image Cache", value = "Coil / Glide In-Memory & Disk Cache")
-                        SettingsInfoRow(title = "Audio Cache", value = "ExoPlayer Media3 Segment Ring Cache")
-                        SettingsInfoRow(title = "Directory", value = context.cacheDir.absolutePath)
+                        SettingsInfoRow("Used", cacheStats.usedBytes?.let { formatCacheBytes(it) } ?: "Unavailable")
+                        SettingsInfoRow("Maximum", if (cacheLimitMb == -1) "Unlimited (storage reserve applies)"
+                            else if (cacheLimitMb == 0) "Disabled" else formatCacheBytes(cacheStats.maxBytes))
+                        SettingsInfoRow("Completely cached songs", cacheStats.completeSongs.toString())
+                        SettingsInfoRow("Partially cached songs", cacheStats.partialSongs.toString())
+                        SettingsInfoRow("Full replay hits / misses", "${cacheStats.hits} / ${cacheStats.misses}")
                     }
-
+                    Text(
+                        "Audio received during playback is automatically cached for replay. Validated complete songs play offline.",
+                        style = MaterialTheme.typography.bodySmall.copy(color = colors.textSecondary)
+                    )
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        AudioCacheLimits.optionsMb.forEach { mb ->
+                            OutlinedButton(onClick = { viewModel.setAudioCacheLimit(mb) }) {
+                                Text((if (cacheStats.maxBytes == AudioCacheLimits.bytes(mb)) "✓ " else "") +
+                                    when (mb) { 0 -> "Disabled"; -1 -> "Unlimited"; 1000 -> "1 GB"; else -> "$mb MB" })
+                            }
+                        }
+                    }
+                    OutlinedButton(onClick = { viewModel.clearAudioCache() }, modifier = Modifier.fillMaxWidth()) {
+                        Text("Clear audio cache")
+                    }
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("Wi-Fi-only next-song prefetch", modifier = Modifier.weight(1f), color = colors.textPrimary)
+                        Switch(checked = prefetchEnabled, onCheckedChange = viewModel::setAudioPrefetch)
+                    }
+                    Text("Off by default. Up to 1 MiB on unmetered Wi-Fi.",
+                        style = MaterialTheme.typography.bodySmall.copy(color = colors.textSecondary))
+                    cacheStats.error?.let {
+                        Text(it, style = MaterialTheme.typography.bodySmall.copy(color = colors.error))
+                    }
                     Spacer(modifier = Modifier.height(16.dp))
-
-                    OutlinedButton(
-                        onClick = {
-                            viewModel.clearCache()
-                            Toast.makeText(context, "Thumbnail and audio cache cleared", Toast.LENGTH_SHORT).show()
-                        },
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Icon(imageVector = Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(text = "Clear Thumbnail & Audio Cache")
+                    SettingsSectionTitle("Artwork cache")
+                    SettingsDetailCard {
+                        SettingsInfoRow("Used on disk", artworkBytes?.let { formatCacheBytes(it) } ?: "Loading…")
+                        SettingsInfoRow("Maximum", "64 MiB")
                     }
-
+                    OutlinedButton(onClick = { viewModel.clearArtworkCache() }, modifier = Modifier.fillMaxWidth()) {
+                        Text("Clear artwork cache")
+                    }
+                    OutlinedButton(onClick = { viewModel.refreshStorage() }, modifier = Modifier.fillMaxWidth()) {
+                        Text("Refresh usage")
+                    }
+                    storageMessage?.let {
+                        Text(it, style = MaterialTheme.typography.bodySmall.copy(color = colors.textSecondary))
+                    }
                     Spacer(modifier = Modifier.height(80.dp))
                 }
             }
@@ -874,12 +1087,12 @@ fun SettingsScreen(
 
                     SettingsDetailCard {
                         SettingsInfoRow(title = "Application", value = "STEREO")
-                        SettingsInfoRow(title = "Release", value = "v2.1.0 Master Release")
-                        SettingsInfoRow(title = "Package", value = "com.nova.music")
+                        SettingsInfoRow(title = "Release", value = "v${BuildConfig.VERSION_NAME} (Build ${BuildConfig.VERSION_CODE})")
+                        SettingsInfoRow(title = "Package", value = BuildConfig.APPLICATION_ID)
                         SettingsInfoRow(title = "Platform", value = "Native Android (Kotlin + Jetpack Compose)")
                         SettingsInfoRow(title = "Architecture", value = "Clean MVVM + Media3 ExoPlayer + Koin DI")
                         SettingsInfoRow(title = "License", value = "Open Source (₹0 Budget, Zero Paid APIs)")
-                        SettingsInfoRow(title = "Audio Engine", value = "InnerTubeX Lossless Extractor")
+                        SettingsInfoRow(title = "Audio Engine", value = "InnerTubeX audio extractor + Media3 Cache")
                     }
 
                     Spacer(modifier = Modifier.height(80.dp))
@@ -1012,3 +1225,6 @@ private fun SettingsInfoRow(title: String, value: String) {
         )
     }
 }
+
+private fun formatCacheBytes(bytes: Long): String =
+    String.format(java.util.Locale.ROOT, "%.1f MB", bytes / 1_000_000.0)

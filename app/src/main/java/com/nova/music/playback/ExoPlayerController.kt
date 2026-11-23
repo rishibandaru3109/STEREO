@@ -1,6 +1,9 @@
 package com.nova.music.playback
 
 import android.content.Context
+import com.nova.music.core.cache.AudioCacheEngine
+import com.nova.music.core.database.dao.SynapseDao
+import com.nova.music.core.database.entity.SynapseEventEntity
 import android.content.Intent
 import android.net.Uri
 import android.os.SystemClock
@@ -14,6 +17,7 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.analytics.AnalyticsListener
 import androidx.media3.exoplayer.source.LoadEventInfo
 import androidx.media3.exoplayer.source.MediaLoadData
+import com.nova.music.domain.model.AudioQualityMode
 import com.nova.music.domain.model.PlaybackState
 import com.nova.music.domain.model.PlayerStatus
 import com.nova.music.domain.model.RepeatMode
@@ -23,6 +27,9 @@ import com.nova.music.domain.repository.HistoryRepository
 import com.nova.music.domain.repository.MusicPreferencesRepository
 import com.nova.music.playback.queue.QueueManager
 import com.nova.music.playback.queue.QueueSnapshot
+import com.synapse.recommendation.engine.SynapseRecommendationEngine
+import com.synapse.recommendation.event.ListeningEvent
+import com.synapse.recommendation.model.SynapseTrack
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -43,14 +50,22 @@ class ExoPlayerController(
     private val exoPlayer: ExoPlayer,
     private val queueManager: QueueManager = QueueManager(),
     private val historyRepository: HistoryRepository? = null,
-    private val preferencesRepository: MusicPreferencesRepository? = null
+    private val preferencesRepository: MusicPreferencesRepository? = null,
+    private val audioCache: AudioCacheEngine? = null,
+    private val synapseEngine: SynapseRecommendationEngine? = null,
+    private val synapseDao: SynapseDao? = null
 ) : NovaPlayerController {
 
     private val scope = CoroutineScope(Dispatchers.Main + Job())
     private var progressJob: Job? = null
     private var resolveJob: Job? = null
+    private var qualityObservationJob: Job? = null
+    private var connectivityObservationJob: Job? = null
     private var playbackRequest = 0L
     private var playWhenResolved = true
+    private var qualityChangePending = false
+    private var resolutionResumePositionMs = 0L
+    private var refreshedUrlTrack: String? = null
     private var listeningSession: ListeningSession? = null
 
     private fun finishListening(manuallySkipped: Boolean = false) {
@@ -68,6 +83,47 @@ class ExoPlayerController(
                 throw cancelled
             } catch (error: Exception) {
                 Log.w("NOVA_DIAGNOSTICS", "Could not save listening history", error)
+            }
+
+            // Autonomous SYNAPSE Event Intelligence Ingestion
+            try {
+                if (preferencesRepository?.isSynapseEnabled?.first() != false && synapseEngine != null) {
+                    val synapseTrack = SynapseTrack(
+                        id = sample.track.id,
+                        title = sample.track.title,
+                        artist = sample.track.artist,
+                        album = sample.track.album,
+                        durationSeconds = sample.track.durationSeconds,
+                        thumbnailUrl = sample.track.thumbnailUrl,
+                        language = sample.track.lyricsLanguage,
+                        isSpokenWord = sample.track.isSpokenWord
+                    )
+                    val event = ListeningEvent(
+                        track = synapseTrack,
+                        listeningDurationMs = sample.listenedMs,
+                        totalTrackDurationMs = sample.durationMs,
+                        completionRatio = if (sample.durationMs > 0) (sample.listenedMs.toFloat() / sample.durationMs.toFloat()).coerceIn(0f, 1f) else 0f,
+                        isManualSkip = sample.isSkipped,
+                        playbackContext = "player"
+                    )
+                    synapseEngine.getTasteIntelligence().processEvent(event)
+                    synapseDao?.insertEvent(
+                        SynapseEventEntity(
+                            eventId = event.eventId,
+                            trackId = sample.track.id,
+                            timestamp = event.timestamp,
+                            listeningDurationMs = sample.listenedMs,
+                            totalTrackDurationMs = sample.durationMs,
+                            completionRatio = event.completionRatio,
+                            isManualSkip = sample.isSkipped,
+                            playbackContext = "player"
+                        )
+                    )
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                Log.w("SYNAPSE_EVENTS", "Could not record SYNAPSE listening event", error)
             }
         }
     }
@@ -118,6 +174,21 @@ class ExoPlayerController(
         }
 
         override fun onPlayerError(error: PlaybackException) {
+            queueManager.getCurrentTrack()?.let { musicRepository.invalidateStream(it.id) }
+            val response = generateSequence<Throwable>(error) { it.cause }
+                .filterIsInstance<HttpDataSource.InvalidResponseCodeException>().firstOrNull()
+            val current = queueManager.getCurrentTrack()
+            if (response?.responseCode in listOf(401, 403, 410) && current != null &&
+                current.streamUrl == null && refreshedUrlTrack != current.id) {
+                refreshedUrlTrack = current.id
+                val position = exoPlayer.currentPosition.coerceAtLeast(0)
+                val requested = playWhenResolved
+                scope.launch {
+                    resolveAndPlay(current, resumePositionMs = position)
+                    playWhenResolved = requested
+                }
+                return
+            }
             val rootCause = error.cause
             Log.e("NOVA_DIAGNOSTICS", "ExoPlayer onPlayerError: errorCode=${error.errorCodeName}(${error.errorCode}), message=${error.message}, cause=${rootCause?.javaClass?.name}: ${rootCause?.message}")
             if (rootCause is HttpDataSource.InvalidResponseCodeException) {
@@ -139,6 +210,39 @@ class ExoPlayerController(
 
     init {
         exoPlayer.addListener(playerListener)
+        qualityObservationJob = scope.launch {
+            var previous: AudioQualityMode? = null
+            musicRepository.effectiveAudioQuality.collect { quality ->
+                val changed = previous != null && previous != quality
+                previous = quality
+                val track = queueManager.getCurrentTrack()
+                if (changed && track != null && track.streamUrl == null) {
+                    qualityChangePending = true
+                    if (exoPlayer.isPlaying || (resolveJob?.isActive == true && playWhenResolved)) {
+                        val position = if (resolveJob?.isActive == true) resolutionResumePositionMs
+                            else exoPlayer.currentPosition.coerceAtLeast(0)
+                        resolveAndPlay(track, resumePositionMs = position)
+                    }
+                }
+            }
+        }
+        connectivityObservationJob = scope.launch {
+            var disconnected = false
+            musicRepository.networkConnected.collect { connected ->
+                val reconnected = disconnected && connected
+                disconnected = !connected
+                val track = queueManager.getCurrentTrack()
+                if (reconnected && playWhenResolved && track != null &&
+                    _playbackState.value.status == PlayerStatus.ERROR
+                ) {
+                    musicRepository.invalidateStream(track.id)
+                    val position = if (exoPlayer.currentMediaItem?.mediaId == track.id) {
+                        _playbackState.value.currentPositionMs
+                    } else resolutionResumePositionMs
+                    resolveAndPlay(track, resumePositionMs = position)
+                }
+            }
+        }
         exoPlayer.addAnalyticsListener(object : AnalyticsListener {
             override fun onLoadStarted(
                 eventTime: AnalyticsListener.EventTime,
@@ -256,21 +360,34 @@ class ExoPlayerController(
         return queueManager.undo()
     }
 
-    private fun resolveAndPlay(track: Track, manuallySkipped: Boolean = false) {
-        finishListening(manuallySkipped)
+    private fun resolveAndPlay(track: Track, manuallySkipped: Boolean = false, resumePositionMs: Long? = null) {
+        if (resumePositionMs == null) finishListening(manuallySkipped)
         resolveJob?.cancel()
         val request = ++playbackRequest
         playWhenResolved = true
+        qualityChangePending = false
+        resolutionResumePositionMs = resumePositionMs ?: 0L
+        if (resumePositionMs == null) refreshedUrlTrack = null
         exoPlayer.pause()
+        exoPlayer.stop()
+        exoPlayer.clearMediaItems()
+        audioCache?.setPlaybackKey(null)
         _playbackState.update {
             it.copy(status = PlayerStatus.BUFFERING, isPlaying = false, errorMessage = null,
-                currentPositionMs = 0L, durationMs = 0L, bufferedPositionMs = 0L)
+                currentPositionMs = resolutionResumePositionMs, durationMs = 0L, bufferedPositionMs = 0L)
         }
 
         resolveJob = scope.launch {
             try {
-                val url = track.streamUrl ?: musicRepository.resolveStream(track.id).getOrThrow().url
-                if (request == playbackRequest) playMediaUri(track, url)
+                val stream = if (track.streamUrl == null) musicRepository.resolveStream(track.id).getOrThrow() else null
+                val key = stream?.let {
+                    audioCache?.prepare(track.id, musicRepository.effectiveAudioQuality.first(), it)
+                }
+                val url = track.streamUrl ?: requireNotNull(stream).url
+                if (request == playbackRequest) {
+                    audioCache?.setPlaybackKey(key)
+                    playMediaUri(track, url, resumePositionMs, key)
+                }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
@@ -285,7 +402,7 @@ class ExoPlayerController(
         }
     }
 
-    private fun playMediaUri(track: Track, uriString: String) {
+    private fun playMediaUri(track: Track, uriString: String, resumePositionMs: Long? = null, cacheKey: String? = null) {
         val mediaMetadata = MediaMetadata.Builder()
             .setTitle(track.title)
             .setArtist(track.artist)
@@ -296,19 +413,26 @@ class ExoPlayerController(
         val mediaItem = MediaItem.Builder()
             .setMediaId(track.id)
             .setUri(uriString)
+            .setCustomCacheKey(cacheKey)
             .setMediaMetadata(mediaMetadata)
             .build()
 
-        listeningSession = ListeningSession(track)
-        exoPlayer.setMediaItem(mediaItem)
+        if (resumePositionMs == null) listeningSession = ListeningSession(track)
+        exoPlayer.setMediaItem(mediaItem, resumePositionMs ?: 0L)
         exoPlayer.prepare()
         exoPlayer.playWhenReady = playWhenResolved
     }
 
     override fun play() {
         playWhenResolved = true
-        if (resolveJob?.isActive == true) return
         val current = queueManager.getCurrentTrack()
+        if (qualityChangePending && current != null && current.streamUrl == null) {
+            val position = if (resolveJob?.isActive == true) resolutionResumePositionMs
+                else exoPlayer.currentPosition.coerceAtLeast(0)
+            resolveAndPlay(current, resumePositionMs = position)
+            return
+        }
+        if (resolveJob?.isActive == true) return
         if (current != null && (exoPlayer.playbackState == Player.STATE_IDLE ||
                 exoPlayer.currentMediaItem?.mediaId != current.id)
         ) {
@@ -410,9 +534,12 @@ class ExoPlayerController(
 
     override fun release() {
         finishListening()
+        qualityObservationJob?.cancel()
+        connectivityObservationJob?.cancel()
         resolveJob?.cancel()
         stopProgressUpdates()
         exoPlayer.removeListener(playerListener)
         exoPlayer.release()
+        audioCache?.setPlaybackKey(null)
     }
 }

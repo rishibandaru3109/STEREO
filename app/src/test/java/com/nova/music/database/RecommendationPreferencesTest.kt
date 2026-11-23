@@ -29,6 +29,18 @@ class RecommendationPreferencesTest {
     }
 
     @Test
+    fun qualitySurvivesRepositoryRecreationAndRecommendationReset() = runTest {
+        val store = InMemoryPreferences()
+        val settings = MusicPreferencesRepositoryImpl(store)
+        assertEquals(com.nova.music.domain.model.AudioQualityMode.AUTO, settings.audioQualityMode.first())
+        settings.setAudioQualityMode(com.nova.music.domain.model.AudioQualityMode.DATA_SAVER)
+        val reloaded = MusicPreferencesRepositoryImpl(store)
+        assertEquals(com.nova.music.domain.model.AudioQualityMode.DATA_SAVER, reloaded.audioQualityMode.first())
+        reloaded.resetRecommendationPreferences()
+        assertEquals(com.nova.music.domain.model.AudioQualityMode.DATA_SAVER, reloaded.audioQualityMode.first())
+    }
+
+    @Test
     fun explicitLanguageSelectionIsSavedTogetherAndResetRemovesIt() = runTest {
         val store = InMemoryPreferences()
         val settings = MusicPreferencesRepositoryImpl(store)
@@ -50,8 +62,9 @@ class RecommendationPreferencesTest {
         val settings = MusicPreferencesRepositoryImpl(InMemoryPreferences())
         val trackDao = FakeTrackDao()
         val cacheDao = FakeRecommendationDao()
+        val historyDao = FakeHistoryDao(trackDao)
         val profile = ListeningProfileRepositoryImpl(
-            FakeHistoryDao(trackDao), FakeLikedSongDao(trackDao), trackDao, cacheDao
+            historyDao, FakeLikedSongDao(trackDao), trackDao, cacheDao
         )
         val catalog = object : CandidateProvider {
             var available = true
@@ -80,8 +93,15 @@ class RecommendationPreferencesTest {
         catalog.available = false
         assertEquals(englishFeed, home.getHomeFeed(false).getOrThrow())
         assertEquals(1, catalog.requests)
+        trackDao.upsert(com.nova.music.core.database.entity.TrackEntity("English-1", "Song 1", "Artist 1"))
+        historyDao.insertHistory(com.nova.music.core.database.entity.ListeningHistoryEntity(
+            trackId = "English-1", listeningDurationMs = 60_000L, completionRatio = 0.9f
+        ))
+        home.getHomeFeed(false).getOrThrow()
+        assertEquals("A completed listen should rerank the cached feed without refetching", 1, catalog.requests)
         settings.saveRecommendationPreferences(setOf("Hindi"), emptySet(), "Familiar")
-        assertTrue(home.getHomeFeed(false).getOrThrow().isEmpty())
+        assertTrue(home.getHomeFeed(false).getOrThrow().filter { it.type != SectionType.RECENTLY_PLAYED }
+            .all { it.tracks.isEmpty() && it.mixes.isEmpty() })
         assertEquals(2, catalog.requests)
     }
 }

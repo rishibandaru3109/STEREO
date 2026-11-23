@@ -1,0 +1,7 @@
+- Automatic Audio Caching: Streamed audio is automatically cached on-device for seamless replay with zero redundant data transfers.
+- Offline Replay: Validated complete cached tracks play offline without an internet connection.
+- SYNAPSE Recommendation Engine: Autonomous dual-horizon recommendation engine learning from listening duration, completion ratios, and contextual skips.
+- Dynamic Home Feed: Quick Picks, Daily Mixes, Weekly Discover, and Because You Listened To rails with MMR diversity calibration.
+- UI Polish: Scroll-aware auto-collapsing Surprise Me FAB, two-line title alignment, lush recommendation shelves, and refined settings typography.
+- Enhanced Stability: Bounded skip penalties, circuit-breaker legacy fallback, and database migration 2 to 3.
+- Zero analytics, zero telemetry, 100% on-device SQLite storage, and ₹0 infrastructure cost.

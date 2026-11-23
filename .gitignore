@@ -19,9 +19,11 @@ release_backup/
 *_reference/
 *.txt
 !fastlane/**
+!release-staging/**
 *.log
 *.jks
 *.keystore
 *.key
 *.p12
+*.apk
 test-output/

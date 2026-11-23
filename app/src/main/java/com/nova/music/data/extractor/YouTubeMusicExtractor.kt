@@ -1,8 +1,17 @@
 package com.nova.music.data.extractor
 
 import com.nova.music.domain.model.AudioStream
+import com.nova.music.domain.model.AudioQualityMode
+import com.nova.music.domain.model.selectAudioFormat
 import com.nova.music.domain.model.Track
 import com.nova.music.domain.repository.MusicExtractor
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
+import okhttp3.Call
+import okhttp3.Callback
+import okhttp3.Response
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import meow.nyx.quackjs.PlayerHints
@@ -210,7 +219,7 @@ class YouTubeMusicExtractor(
                 val runTexts = mutableListOf<String>()
                 for (k in 0 until col1Runs.length()) {
                     val t = col1Runs.optJSONObject(k)?.optString("text")?.trim() ?: ""
-                    if (t.isNotEmpty() && t != "•" && t != "·") {
+                    if (t.isNotEmpty() && t != "ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¢" && t != "ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â·") {
                         runTexts.add(t)
                     }
                 }
@@ -366,15 +375,20 @@ class YouTubeMusicExtractor(
         }
     }
 
-    override suspend fun resolveAudioStream(trackId: String): Result<AudioStream> = withContext(Dispatchers.IO) {
+    override suspend fun resolveAudioStream(trackId: String): Result<AudioStream> =
+        resolveAudioStream(trackId, AudioQualityMode.HIGH)
+
+    override suspend fun resolveAudioStream(trackId: String, quality: AudioQualityMode): Result<AudioStream> = withContext(Dispatchers.IO) {
         val startTime = System.currentTimeMillis()
         try {
-            val stream = resolveWithWebRemix(trackId)
+            val stream = resolveWithWebRemix(trackId, quality)
             val elapsed = System.currentTimeMillis() - startTime
             if (stream != null) {
                 logDiag("Stream resolved successfully in ${elapsed}ms for track: $trackId (codec=${stream.codec}, itag=${stream.formatId})")
                 return@withContext Result.success(stream)
             }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (e: Exception) {
             val elapsed = System.currentTimeMillis() - startTime
             logDiagError("Stream resolution failed after ${elapsed}ms for track $trackId: ${e.message}")
@@ -383,7 +397,7 @@ class YouTubeMusicExtractor(
         Result.failure(IOException("Could not resolve playable audio stream for track: $trackId"))
     }
 
-    private fun resolveWithWebRemix(trackId: String): AudioStream? {
+    private suspend fun resolveWithWebRemix(trackId: String, quality: AudioQualityMode): AudioStream? {
         val url = "https://music.youtube.com/youtubei/v1/player"
         val requestBody = JSONObject().apply {
             put("context", JSONObject().apply {
@@ -411,14 +425,29 @@ class YouTubeMusicExtractor(
             .post(requestBody)
             .build()
 
-        httpClient.newCall(request).execute().use { response ->
+        awaitResponse(request).use { response ->
             if (!response.isSuccessful) return null
             val body = response.body?.string() ?: return null
-            return selectAndDecipherAudioStream(body)
+            return selectAndDecipherAudioStream(body, quality)
         }
     }
 
-    private fun selectAndDecipherAudioStream(jsonStr: String): AudioStream? {
+    private suspend fun awaitResponse(request: Request): Response =
+        suspendCancellableCoroutine { continuation ->
+            val call = httpClient.newCall(request)
+            continuation.invokeOnCancellation { call.cancel() }
+            call.enqueue(object : Callback {
+                override fun onFailure(call: Call, error: IOException) {
+                    if (!continuation.isCancelled) continuation.resumeWithException(error)
+                }
+
+                override fun onResponse(call: Call, response: Response) {
+                    continuation.resume(response) { response.close() }
+                }
+            })
+        }
+
+    internal fun selectAndDecipherAudioStream(jsonStr: String, quality: AudioQualityMode = AudioQualityMode.HIGH): AudioStream? {
         val root = JSONObject(jsonStr)
         val streamingData = root.optJSONObject("streamingData") ?: return null
         val formats = streamingData.optJSONArray("adaptiveFormats") ?: return null
@@ -430,7 +459,8 @@ class YouTubeMusicExtractor(
             val codec: String,
             val bitrate: Int,
             val itag: String,
-            val contentLength: Long
+            val contentLength: Long,
+            val isDefault: Boolean?
         )
 
         val candidates = mutableListOf<CandidateFormat>()
@@ -446,7 +476,7 @@ class YouTubeMusicExtractor(
 
             if (directUrl == null && cipher == null) continue
 
-            val bitrate = format.optInt("bitrate", 128000)
+            val bitrate = format.optInt("bitrate", 0)
             val itag = format.optInt("itag", 0).toString()
             val contentLength = format.optLong("contentLength", 0L)
             val isOpus = mimeType.contains("opus")
@@ -459,18 +489,15 @@ class YouTubeMusicExtractor(
                     codec = if (isOpus) "opus" else "aac",
                     bitrate = bitrate,
                     itag = itag,
-                    contentLength = contentLength
+                    contentLength = contentLength,
+                    isDefault = format.optJSONObject("audioTrack")?.optBoolean("audioIsDefault")
                 )
             )
         }
 
-        // Selection priority: Opus format with highest bitrate (itag 251), then AAC (itag 140)
-        val bestCandidate = candidates
-            .sortedWith(
-                compareByDescending<CandidateFormat> { it.codec == "opus" }
-                    .thenByDescending { it.bitrate }
-            )
-            .firstOrNull() ?: return null
+        // Keep original/default language tracks when dubbed variants are exposed.
+        val eligible = candidates.filter { it.isDefault == true }.ifEmpty { candidates }
+        val bestCandidate = selectAudioFormat(eligible, quality) { it.bitrate } ?: return null
 
         logDiag("Format candidate selected: itag=${bestCandidate.itag}, codec=${bestCandidate.codec}, bitrate=${bestCandidate.bitrate}, contentLength=${bestCandidate.contentLength}, hasDirectUrl=${bestCandidate.directUrl != null}")
 
