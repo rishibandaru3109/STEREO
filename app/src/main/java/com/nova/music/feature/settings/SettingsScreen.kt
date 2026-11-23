@@ -59,6 +59,7 @@ import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -666,23 +667,36 @@ fun SettingsScreen(
                             ) {
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Text(
                                         text = "Discovery Calibration (MMR)",
                                         style = MaterialTheme.typography.bodyMedium.copy(
                                             color = colors.textPrimary,
                                             fontWeight = FontWeight.SemiBold
-                                        )
+                                        ),
+                                        modifier = Modifier.weight(1f, fill = false)
                                     )
-                                    Text(
-                                        text = if (synapseDiscoveryAlpha > 0.70f) "Familiar" else if (synapseDiscoveryAlpha < 0.45f) "Adventurous" else "Balanced",
-                                        style = MaterialTheme.typography.bodySmall.copy(
-                                            color = colors.primaryAccent,
-                                            fontWeight = FontWeight.Bold
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .background(colors.primaryAccent.copy(alpha = 0.15f))
+                                            .padding(horizontal = 10.dp, vertical = 4.dp)
+                                    ) {
+                                        Text(
+                                            text = if (synapseDiscoveryAlpha > 0.70f) "Familiar (70%)" else if (synapseDiscoveryAlpha < 0.45f) "Adventurous (35%)" else "Balanced (65%)",
+                                            style = MaterialTheme.typography.labelMedium.copy(
+                                                color = colors.primaryAccent,
+                                                fontWeight = FontWeight.Bold
+                                            ),
+                                            maxLines = 1,
+                                            softWrap = false
                                         )
-                                    )
+                                    }
                                 }
+                                Spacer(modifier = Modifier.height(4.dp))
                                 Text(
                                     text = "Balances familiar favorites against exploratory long-tail music",
                                     style = MaterialTheme.typography.bodySmall.copy(color = colors.textSecondary)
@@ -698,6 +712,44 @@ fun SettingsScreen(
                                         inactiveTrackColor = colors.surfaceHighlight
                                     )
                                 )
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "Adventurous (0.2)",
+                                        style = MaterialTheme.typography.labelSmall.copy(
+                                            fontSize = 9.5.sp,
+                                            color = colors.textSecondary
+                                        ),
+                                        modifier = Modifier.weight(1.25f),
+                                        textAlign = TextAlign.Start,
+                                        maxLines = 1,
+                                        softWrap = false
+                                    )
+                                    Text(
+                                        text = "Balanced (0.65)",
+                                        style = MaterialTheme.typography.labelSmall.copy(
+                                            fontSize = 9.5.sp,
+                                            color = colors.textSecondary
+                                        ),
+                                        modifier = Modifier.weight(1.1f),
+                                        textAlign = TextAlign.Center,
+                                        maxLines = 1,
+                                        softWrap = false
+                                    )
+                                    Text(
+                                        text = "Familiar (0.9)",
+                                        style = MaterialTheme.typography.labelSmall.copy(
+                                            fontSize = 9.5.sp,
+                                            color = colors.textSecondary
+                                        ),
+                                        modifier = Modifier.weight(1.0f),
+                                        textAlign = TextAlign.End,
+                                        maxLines = 1,
+                                        softWrap = false
+                                    )
+                                }
                             }
                         }
                     }

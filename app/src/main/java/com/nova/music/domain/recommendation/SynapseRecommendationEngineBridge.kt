@@ -12,6 +12,7 @@ import com.synapse.recommendation.engine.SynapseRecommendationEngine
 import com.synapse.recommendation.model.RecommendationCandidate
 import com.synapse.recommendation.model.RecommendationContext
 import com.synapse.recommendation.model.SynapseTrack
+import com.synapse.recommendation.similarity.ContentSimilarityEngine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlin.random.Random
@@ -30,6 +31,8 @@ class SynapseRecommendationEngineBridge(
     private val preferencesRepository: MusicPreferencesRepository,
     private val legacyEngine: RecommendationEngineImpl = RecommendationEngineImpl()
 ) : RecommendationEngine {
+
+    private val similarityEngine = ContentSimilarityEngine()
 
     companion object {
         private const val TAG = "SYNAPSE_BRIDGE"
@@ -156,7 +159,7 @@ class SynapseRecommendationEngineBridge(
 
         // 2. DAILY MIX (Curated mixes built from SYNAPSE affinity clusters)
         val availableForMixes = rankedTracks.filter { it.id !in consumedTrackIds }
-        val mixes = generateDailyMixes(profile, availableForMixes, consumedTrackIds)
+        val mixes = generateDailyMixes(profile, availableForMixes)
         if (mixes.isNotEmpty()) {
             sections.add(
                 RecommendationSection(
@@ -191,7 +194,7 @@ class SynapseRecommendationEngineBridge(
             track.id !in consumedTrackIds &&
             track.id !in knownTrackIds &&
             (topArtist == null || !track.artist.equals(topArtist, ignoreCase = true))
-        }.take(15)
+        }.take(8)
 
         if (discoverTracks.isNotEmpty()) {
             sections.add(
@@ -207,28 +210,47 @@ class SynapseRecommendationEngineBridge(
 
         // 5. BECAUSE YOU LISTENED TO [Artist]
         if (topArtist != null) {
-            var artistTracks = rankedTracks.filter {
+            val directTracks = rankedTracks.filter {
                 it.id !in consumedTrackIds && it.artist.equals(topArtist, ignoreCase = true)
-            }.take(12)
+            }
+            val similarTracks = rankedTracks.filter {
+                it.id !in consumedTrackIds &&
+                !it.artist.equals(topArtist, ignoreCase = true) &&
+                similarityEngine.computeArtistSimilarity(it.artist, topArtist) >= 0.20
+            }
+            val artistTracks = (directTracks + similarTracks).distinctBy { it.id }.toMutableList()
 
-            // If other rails (e.g. daily mix) consumed all tracks, ensure the dedicated artist rail is preserved
+            // If other rails consumed all tracks, ensure the dedicated artist rail is preserved
             if (artistTracks.isEmpty()) {
                 val quickPickIds = quickPicks.map { it.id }.toSet()
-                artistTracks = rankedTracks.filter {
+                val fallbackDirect = rankedTracks.filter {
                     it.id !in quickPickIds && it.artist.equals(topArtist, ignoreCase = true)
-                }.take(12)
+                }
+                artistTracks.addAll(fallbackDirect)
             }
 
-            if (artistTracks.isNotEmpty()) {
+            // Complementary candidates: if the rail is underfilled (< 4 tracks), supplement with
+            // candidates outside quick picks to ensure a lush, engaging rail (4-8 tracks)
+            if (artistTracks.size < 4) {
+                val quickPickIds = quickPicks.map { it.id }.toSet()
+                val complementary = rankedTracks.filter {
+                    it.id !in quickPickIds && it !in artistTracks
+                }.take(6 - artistTracks.size)
+                artistTracks.addAll(complementary)
+            }
+
+            val finalArtistTracks = artistTracks.distinctBy { it.id }.take(12)
+
+            if (finalArtistTracks.isNotEmpty()) {
                 sections.add(
                     RecommendationSection(
                         type = SectionType.BECAUSE_YOU_LISTENED,
                         title = "Because You Listened To $topArtist",
                         subtitle = "More tracks from and inspired by your top artist",
-                        tracks = artistTracks
+                        tracks = finalArtistTracks
                     )
                 )
-                consumedTrackIds.addAll(artistTracks.map { it.id })
+                consumedTrackIds.addAll(finalArtistTracks.map { it.id })
             }
         }
 
@@ -251,16 +273,17 @@ class SynapseRecommendationEngineBridge(
 
     private fun generateDailyMixes(
         profile: ListeningProfile,
-        candidates: List<Track>,
-        consumedTrackIds: MutableSet<String>
+        candidates: List<Track>
     ): List<RecommendationMix> {
         val mixes = mutableListOf<RecommendationMix>()
         if (candidates.isEmpty()) return mixes
 
+        val usedInMixes = mutableSetOf<String>()
+
         if (!profile.isColdStart && profile.topArtists.isNotEmpty()) {
             val artist1 = profile.topArtists.first().artistName
-            val artist1Tracks = candidates.filter { it.artist.equals(artist1, ignoreCase = true) && it.id !in consumedTrackIds }
-            val otherTracks = candidates.filter { !it.artist.equals(artist1, ignoreCase = true) && it.id !in consumedTrackIds }
+            val artist1Tracks = candidates.filter { it.artist.equals(artist1, ignoreCase = true) }
+            val otherTracks = candidates.filter { !it.artist.equals(artist1, ignoreCase = true) }
             val mix1Tracks = (artist1Tracks.take(6) + otherTracks.take(8)).distinctBy { it.id }
 
             if (mix1Tracks.isNotEmpty()) {
@@ -273,13 +296,13 @@ class SynapseRecommendationEngineBridge(
                         coverArtUrls = mix1Tracks.mapNotNull { it.thumbnailUrl.takeIf { u -> u.isNotBlank() } }.take(4)
                     )
                 )
-                consumedTrackIds.addAll(mix1Tracks.map { it.id })
+                usedInMixes.addAll(mix1Tracks.map { it.id })
             }
 
             val artist2 = profile.topArtists.getOrNull(1)?.artistName
             if (artist2 != null) {
-                val artist2Tracks = candidates.filter { it.artist.equals(artist2, ignoreCase = true) && it.id !in consumedTrackIds }
-                val remaining = candidates.filter { !it.artist.equals(artist2, ignoreCase = true) && it.id !in consumedTrackIds }
+                val artist2Tracks = candidates.filter { it.artist.equals(artist2, ignoreCase = true) && it.id !in usedInMixes }
+                val remaining = candidates.filter { !it.artist.equals(artist2, ignoreCase = true) && it.id !in usedInMixes }
                 val mix2Tracks = (artist2Tracks.take(6) + remaining.take(8)).distinctBy { it.id }
 
                 if (mix2Tracks.isNotEmpty()) {
@@ -292,8 +315,43 @@ class SynapseRecommendationEngineBridge(
                             coverArtUrls = mix2Tracks.mapNotNull { it.thumbnailUrl.takeIf { u -> u.isNotBlank() } }.take(4)
                         )
                     )
-                    consumedTrackIds.addAll(mix2Tracks.map { it.id })
+                    usedInMixes.addAll(mix2Tracks.map { it.id })
                 }
+            } else {
+                // When only 1 top artist exists, provide Discovery Mix as the second mix
+                val discoveryCandidates = candidates.filter {
+                    it.id !in usedInMixes && !it.artist.equals(artist1, ignoreCase = true)
+                }
+                val discoveryTracks = (discoveryCandidates.take(12).ifEmpty {
+                    candidates.filter { it.id !in usedInMixes }.take(12)
+                }).distinctBy { it.id }
+
+                if (discoveryTracks.isNotEmpty()) {
+                    mixes.add(
+                        RecommendationMix(
+                            id = "synapse_mix_discovery",
+                            title = "Discovery Mix",
+                            subtitle = "Fresh sounds & unexpected gems",
+                            tracks = discoveryTracks,
+                            coverArtUrls = discoveryTracks.mapNotNull { it.thumbnailUrl.takeIf { u -> u.isNotBlank() } }.take(4)
+                        )
+                    )
+                    usedInMixes.addAll(discoveryTracks.map { it.id })
+                }
+            }
+        } else {
+            // Cold start trending mix
+            val coldStartTracks = candidates.take(14)
+            if (coldStartTracks.isNotEmpty()) {
+                mixes.add(
+                    RecommendationMix(
+                        id = "synapse_mix_trending",
+                        title = "Trending Mix",
+                        subtitle = "Popular tracks to kickstart your journey",
+                        tracks = coldStartTracks,
+                        coverArtUrls = coldStartTracks.mapNotNull { it.thumbnailUrl.takeIf { u -> u.isNotBlank() } }.take(4)
+                    )
+                )
             }
         }
 
