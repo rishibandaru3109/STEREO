@@ -10,6 +10,7 @@ import com.metrolist.innertubex.extraction.StreamExtractor
 import com.metrolist.innertubex.extraction.YtConfigParserImpl
 import com.metrolist.innertubex.models.YouTubeClient
 import com.nova.music.domain.model.AudioStream
+import com.nova.music.domain.model.AudioQualityMode
 import com.nova.music.domain.model.Track
 import com.nova.music.domain.repository.MusicExtractor
 import io.ktor.client.HttpClient
@@ -17,6 +18,7 @@ import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.statement.bodyAsText
 import io.ktor.serialization.kotlinx.json.json
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
@@ -103,16 +105,30 @@ class InnerTubeXExtractor(
         }
     }
 
-    override suspend fun resolveAudioStream(trackId: String): Result<AudioStream> = withContext(Dispatchers.IO) {
+    override suspend fun resolveAudioStream(trackId: String): Result<AudioStream> =
+        resolveAudioStream(trackId, AudioQualityMode.HIGH)
+
+    override suspend fun resolveAudioStream(trackId: String, quality: AudioQualityMode): Result<AudioStream> = withContext(Dispatchers.IO) {
         val startTime = System.currentTimeMillis()
         logI("Resolving audio stream via InnerTubeX for track: $trackId")
+
+        val formatSelection = if (quality != AudioQualityMode.HIGH) {
+            fallbackExtractor.resolveAudioStream(trackId, quality)
+        } else null
+        if (formatSelection?.isSuccess == true) return@withContext formatSelection
 
         val extracted = try {
             streamExtractor.extract(
                 videoId = trackId,
                 hints = ContentHints(),
-                audioQuality = AudioQuality.AUTO
+                audioQuality = when (quality) {
+                    AudioQualityMode.DATA_SAVER -> AudioQuality.LOW
+                    AudioQualityMode.BALANCED -> AudioQuality.MP4
+                    else -> AudioQuality.HIGH
+                }
             )
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (e: Exception) {
             logE("InnerTubeX extraction error: ${e.message}", e)
             null
@@ -144,7 +160,7 @@ class InnerTubeXExtractor(
         } else {
             val elapsed = System.currentTimeMillis() - startTime
             logI("InnerTubeX returned unverified or non-playable URL in ${elapsed}ms. Seamlessly falling back to YouTubeMusicExtractor for track: $trackId")
-            val fallbackResult = fallbackExtractor.resolveAudioStream(trackId)
+            val fallbackResult = formatSelection ?: fallbackExtractor.resolveAudioStream(trackId, quality)
             if (fallbackResult.isSuccess) {
                 val totalElapsed = System.currentTimeMillis() - startTime
                 logI("Fallback YouTubeMusicExtractor resolved stream in ${totalElapsed}ms for track: $trackId")

@@ -96,8 +96,9 @@ android {
     }
 
     lint {
-        checkReleaseBuilds = false
-        abortOnError = false
+        checkReleaseBuilds = true
+        abortOnError = true
+        disable += "UnsafeOptInUsageError"
     }
 
     packaging {
@@ -108,8 +109,8 @@ android {
 }
 
 dependencies {
-    // SYNAPSE Recommendation Engine (Independent Module via Composite Build)
-    implementation("com.synapse.recommendation:synapse:1.0.0")
+    // SYNAPSE Recommendation Engine (Independent Module)
+    implementation(project(":Synapse"))
 
     // AndroidX & Core
     implementation("androidx.core:core-ktx:1.13.1")

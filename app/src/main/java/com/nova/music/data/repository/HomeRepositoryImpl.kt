@@ -1,6 +1,7 @@
 package com.nova.music.data.repository
 
 import com.nova.music.core.database.dao.RecommendationDao
+import com.nova.music.core.network.TrafficMeter
 import com.nova.music.core.database.entity.RecommendationCacheEntity
 import com.nova.music.domain.model.RecommendationSection
 import com.nova.music.domain.model.SectionType
@@ -51,8 +52,8 @@ class HomeRepositoryImpl(
         val fingerprint = listOf(
             preferences.languages.sorted(), preferences.genres.sorted(), preferences.discoveryMode,
             preferences.contentFilterMode, profile.likedTrackIds.sorted(),
-            profile.topTracks.take(12).map { it.trackId }, profile.lastListenAt, profile.totalListens,
-            profile.totalSkips, excluded.sorted()
+            // Regenerate sections from current history locally without refetching the catalog after every song.
+            profile.totalListens / 10, excluded.sorted()
         ).hashCode().toString()
 
         val cached = recommendationDao.getCachedSection(CANDIDATE_CACHE)
@@ -60,6 +61,7 @@ class HomeRepositoryImpl(
             ?.let { TrackJsonSerializer.deserializeTracks(it.tracksJson) }.orEmpty()
             .filter { it.id !in excluded && RecommendationEligibility.accepts(it, preferences) }
         val candidates = if (!forceRefresh && cached?.sectionTitle == fingerprint && cached.expiresAt > now) {
+            TrafficMeter.counters.metadataCacheHit()
             cachedTracks
         } else {
             val fresh = try {
@@ -79,11 +81,11 @@ class HomeRepositoryImpl(
                         sectionTitle = fingerprint,
                         tracksJson = TrackJsonSerializer.serializeTracks(merged.take(160)),
                         cachedAt = if (remoteCount > 0) now else cached?.cachedAt ?: now,
-                        expiresAt = now + if (remoteCount >= 12) 30 * MINUTE else MINUTE
+                        expiresAt = now + if (remoteCount >= 12) 60 * MINUTE else 5 * MINUTE
                     )
                 )
             } else if (now - cached.cachedAt <= OFFLINE_TTL) {
-                recommendationDao.cacheSection(cached.copy(sectionTitle = fingerprint, expiresAt = now + MINUTE))
+                recommendationDao.cacheSection(cached.copy(sectionTitle = fingerprint, expiresAt = now + 5 * MINUTE))
             }
             merged
         }

@@ -48,4 +48,4 @@ STEREO Release 2 introduces two major architectural capabilities to the music pl
 - **Version Code:** `7`
 - **APK File:** `STEREO-v1.0.0-beta.1-release.apk`
 - **APK Size:** 18,415,227 bytes
-- **SHA-256 Checksum:** `41caf448b36ed6f26dd8a8d3450939722c9d732db58f9d234c45f5ec85b085cd`
+- **SHA-256 Checksum:** `8de248781e2e4bf810bbcd58b87291eddfd56e4e1d6c3ded251ef4b5c852eb3e`

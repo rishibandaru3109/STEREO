@@ -23,5 +23,10 @@ dependencyResolutionManagement {
 
 rootProject.name = "NOVA Music"
 include(":app")
-includeBuild("../Synapse")
+if (file("Synapse").exists()) {
+    include(":Synapse")
+} else if (file("../Synapse").exists()) {
+    include(":Synapse")
+    project(":Synapse").projectDir = file("../Synapse")
+}
 

@@ -67,8 +67,15 @@ fun RecommendationOnboardingDialog(
 ) {
     val colors = StereoTheme.colors
 
-    val normalizedInitialLanguages = remember(initialLanguages) {
-        StereoLanguages.normalize(initialLanguages).ifEmpty { initialLanguages.ifEmpty { setOf("English", "Hindi") } }
+    val normalizedInitialLanguages: Set<String> = remember(initialLanguages) {
+        val normalized = StereoLanguages.normalize(initialLanguages)
+        if (normalized.isNotEmpty()) {
+            normalized
+        } else if (initialLanguages.isNotEmpty()) {
+            initialLanguages
+        } else {
+            setOf("English", "Hindi")
+        }
     }
     var selectedLanguages by remember { mutableStateOf(normalizedInitialLanguages) }
     var selectedGenres by remember { mutableStateOf(initialGenres) }
