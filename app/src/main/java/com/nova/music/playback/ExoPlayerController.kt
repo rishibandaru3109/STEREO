@@ -66,6 +66,7 @@ class ExoPlayerController(
     private var qualityChangePending = false
     private var resolutionResumePositionMs = 0L
     private var refreshedUrlTrack: String? = null
+    private val streamRetryCounts = mutableMapOf<String, Int>()
     private var listeningSession: ListeningSession? = null
 
     private fun finishListening(manuallySkipped: Boolean = false) {
@@ -140,6 +141,7 @@ class ExoPlayerController(
                 }
                 Player.STATE_READY -> {
                     val duration = exoPlayer.duration.coerceAtLeast(0L)
+                    queueManager.getCurrentTrack()?.id?.let { streamRetryCounts.remove(it) }
                     _playbackState.update {
                         it.copy(
                             status = if (exoPlayer.isPlaying) PlayerStatus.PLAYING else PlayerStatus.PAUSED,
@@ -174,21 +176,26 @@ class ExoPlayerController(
         }
 
         override fun onPlayerError(error: PlaybackException) {
-            queueManager.getCurrentTrack()?.let { musicRepository.invalidateStream(it.id) }
+            val current = queueManager.getCurrentTrack()
+            current?.let { musicRepository.invalidateStream(it.id) }
             val response = generateSequence<Throwable>(error) { it.cause }
                 .filterIsInstance<HttpDataSource.InvalidResponseCodeException>().firstOrNull()
-            val current = queueManager.getCurrentTrack()
-            if (response?.responseCode in listOf(401, 403, 410) && current != null &&
-                current.streamUrl == null && refreshedUrlTrack != current.id) {
-                refreshedUrlTrack = current.id
-                val position = exoPlayer.currentPosition.coerceAtLeast(0)
-                val requested = playWhenResolved
-                scope.launch {
-                    resolveAndPlay(current, resumePositionMs = position)
-                    playWhenResolved = requested
+
+            if (current != null && current.streamUrl == null && response?.responseCode in listOf(401, 403, 410)) {
+                val retries = streamRetryCounts.getOrDefault(current.id, 0)
+                if (retries < 2) {
+                    streamRetryCounts[current.id] = retries + 1
+                    val position = exoPlayer.currentPosition.coerceAtLeast(0)
+                    val requested = playWhenResolved
+                    scope.launch {
+                        Log.w("NOVA_DIAGNOSTICS", "HTTP ${response?.responseCode} encountered. Re-resolving fresh stream (attempt ${retries + 1}/2) for track ${current.id}")
+                        resolveAndPlay(current, resumePositionMs = position)
+                        playWhenResolved = requested
+                    }
+                    return
                 }
-                return
             }
+
             val rootCause = error.cause
             Log.e("NOVA_DIAGNOSTICS", "ExoPlayer onPlayerError: errorCode=${error.errorCodeName}(${error.errorCode}), message=${error.message}, cause=${rootCause?.javaClass?.name}: ${rootCause?.message}")
             if (rootCause is HttpDataSource.InvalidResponseCodeException) {
@@ -198,11 +205,19 @@ class ExoPlayerController(
                 }
                 Log.e("NOVA_DIAGNOSTICS", "Response headers: $safeHeaders")
             }
+
+            val friendlyMessage = when {
+                response?.responseCode in listOf(401, 403) -> "Stream access expired or restricted (HTTP 403). Tap to retry."
+                response?.responseCode == 410 -> "Stream link expired (HTTP 410). Tap to reconnect."
+                rootCause is java.net.UnknownHostException || rootCause is java.net.ConnectException -> "No internet connection. Reconnect to stream."
+                else -> error.localizedMessage ?: "Playback error: ${error.errorCodeName}"
+            }
+
             _playbackState.update {
                 it.copy(
                     status = PlayerStatus.ERROR,
                     isPlaying = false,
-                    errorMessage = error.localizedMessage ?: "Playback error: ${error.errorCodeName}"
+                    errorMessage = friendlyMessage
                 )
             }
         }

@@ -4,6 +4,7 @@ import androidx.room.Database
 import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
+import com.nova.music.core.database.dao.DownloadDao
 import com.nova.music.core.database.dao.HistoryDao
 import com.nova.music.core.database.dao.LikedSongDao
 import com.nova.music.core.database.dao.PlaylistDao
@@ -11,9 +12,11 @@ import com.nova.music.core.database.dao.QueueDao
 import com.nova.music.core.database.dao.RecommendationDao
 import com.nova.music.core.database.dao.SynapseDao
 import com.nova.music.core.database.dao.TrackDao
+import com.nova.music.core.database.entity.DownloadEntity
 import com.nova.music.core.database.entity.ExplicitFeedbackEntity
 import com.nova.music.core.database.entity.LikedSongEntity
 import com.nova.music.core.database.entity.ListeningHistoryEntity
+import com.nova.music.core.database.entity.PlaylistDownloadEntity
 import com.nova.music.core.database.entity.PlaylistEntity
 import com.nova.music.core.database.entity.PlaylistEntryEntity
 import com.nova.music.core.database.entity.QueueStateEntity
@@ -33,9 +36,11 @@ import com.nova.music.core.database.entity.TrackEntity
         RecommendationCacheEntity::class,
         ExplicitFeedbackEntity::class,
         SynapseEventEntity::class,
-        SynapseTasteProfileEntity::class
+        SynapseTasteProfileEntity::class,
+        DownloadEntity::class,
+        PlaylistDownloadEntity::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 abstract class StereoDatabase : RoomDatabase() {
@@ -46,6 +51,7 @@ abstract class StereoDatabase : RoomDatabase() {
     abstract fun queueDao(): QueueDao
     abstract fun recommendationDao(): RecommendationDao
     abstract fun synapseDao(): SynapseDao
+    abstract fun downloadDao(): DownloadDao
 
     companion object {
         val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -105,6 +111,47 @@ abstract class StereoDatabase : RoomDatabase() {
                     )
                     """.trimIndent()
                 )
+            }
+        }
+
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `downloads` (
+                        `trackId` TEXT NOT NULL PRIMARY KEY,
+                        `title` TEXT NOT NULL,
+                        `artist` TEXT NOT NULL,
+                        `album` TEXT,
+                        `durationSeconds` INTEGER NOT NULL DEFAULT 0,
+                        `thumbnailUrl` TEXT NOT NULL DEFAULT '',
+                        `quality` TEXT NOT NULL DEFAULT 'HIGH',
+                        `status` TEXT NOT NULL DEFAULT 'COMPLETED',
+                        `downloadedBytes` INTEGER NOT NULL DEFAULT 0,
+                        `totalBytes` INTEGER NOT NULL DEFAULT 0,
+                        `filePath` TEXT NOT NULL DEFAULT '',
+                        `mimeType` TEXT NOT NULL DEFAULT 'audio/webm',
+                        `createdAt` INTEGER NOT NULL,
+                        `completedAt` INTEGER,
+                        `errorMessage` TEXT
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_downloads_status` ON `downloads` (`status`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_downloads_createdAt` ON `downloads` (`createdAt`)")
+
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `playlist_downloads` (
+                        `playlistId` TEXT NOT NULL,
+                        `trackId` TEXT NOT NULL,
+                        `addedAt` INTEGER NOT NULL,
+                        PRIMARY KEY(`playlistId`, `trackId`)
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_playlist_downloads_playlistId` ON `playlist_downloads` (`playlistId`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_playlist_downloads_trackId` ON `playlist_downloads` (`trackId`)")
             }
         }
     }

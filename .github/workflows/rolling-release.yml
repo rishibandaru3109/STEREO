@@ -1,0 +1,94 @@
+name: Rolling Latest Beta Release
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      source_tag:
+        description: 'Source release tag to promote to latest-beta (e.g. v1.0.0-beta.2)'
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  update-rolling-release:
+    name: Update Permanent Latest Beta APK
+    runs-on: ubuntu-latest
+    # Prevent infinite recursive trigger if latest-beta itself is published
+    if: (github.event_name == 'release' && github.event.release.tag_name != 'latest-beta') || github.event_name == 'workflow_dispatch'
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine Source Release Tag
+        id: determine_tag
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ inputs.source_tag }}" ]; then
+            TAG="${{ inputs.source_tag }}"
+          elif [ "${{ github.event_name }}" = "release" ]; then
+            TAG="${{ github.event.release.tag_name }}"
+          else
+            # Fallback to latest semver tag
+            TAG=$(git describe --tags --abbrev=0 --match "v*")
+          fi
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "Selected source tag: $TAG"
+
+      - name: Download Release Assets from Source Tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p artifacts
+          echo "Fetching assets for tag ${{ steps.determine_tag.outputs.tag }}..."
+          gh release download "${{ steps.determine_tag.outputs.tag }}" --dir artifacts --pattern "*.apk*" || true
+          
+          # Find the main production release apk
+          APK_FILE=$(find artifacts -name "*release*.apk" -o -name "STEREO*.apk" | head -n 1)
+          if [ -z "$APK_FILE" ]; then
+            echo "::error::No APK asset found in release tag ${{ steps.determine_tag.outputs.tag }}"
+            exit 1
+          fi
+          echo "Found source APK: $APK_FILE"
+          
+          # Copy to canonical rolling filename
+          cp "$APK_FILE" STEREO-latest.apk
+          
+          # Compute SHA-256 Checksum
+          sha256sum STEREO-latest.apk > STEREO-latest.apk.sha256
+          cat STEREO-latest.apk.sha256
+
+      - name: Update or Create Rolling latest-beta Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          RELEASE_BODY="### STEREO Permanent Latest Beta Build
+
+This is a permanent direct download link for the latest verified STEREO Beta release.
+
+- **Current Version Tag:** \`${{ steps.determine_tag.outputs.tag }}\`
+- **Permanent Download URL:** \`https://github.com/${{ github.repository }}/releases/download/latest-beta/STEREO-latest.apk\`
+- **SHA-256 Checksum:**
+\`\`\`
+$(cat STEREO-latest.apk.sha256)
+\`\`\`
+
+*Note: This release is updated automatically whenever a new official release is published.*"
+
+          # Check if latest-beta release already exists
+          if gh release view latest-beta > /dev/null 2>&1; then
+            echo "Updating existing latest-beta release..."
+            gh release edit latest-beta --title "STEREO Latest Beta (${{ steps.determine_tag.outputs.tag }})" --notes "$RELEASE_BODY"
+            gh release upload latest-beta STEREO-latest.apk STEREO-latest.apk.sha256 --clobber
+          else
+            echo "Creating new rolling latest-beta release..."
+            gh release create latest-beta STEREO-latest.apk STEREO-latest.apk.sha256 \
+              --title "STEREO Latest Beta (${{ steps.determine_tag.outputs.tag }})" \
+              --notes "$RELEASE_BODY" \
+              --prerelease
+          fi

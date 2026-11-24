@@ -162,6 +162,15 @@ class SettingsViewModel(
     val contentFilterMode: StateFlow<ContentFilterMode> = preferencesRepository.contentFilterMode
         .stateIn(viewModelScope, SharingStarted.Eagerly, ContentFilterMode.MUSIC_ONLY)
 
+    val isDownloadWifiOnly: StateFlow<Boolean> = preferencesRepository.isDownloadWifiOnly
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    fun setDownloadWifiOnly(wifiOnly: Boolean) {
+        viewModelScope.launch {
+            preferencesRepository.setDownloadWifiOnly(wifiOnly)
+        }
+    }
+
     val officialThemes = ThemePresets.officialThemes
 
     fun selectTheme(themeId: String) {

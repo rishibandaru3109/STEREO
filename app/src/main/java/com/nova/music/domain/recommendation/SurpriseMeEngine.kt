@@ -45,7 +45,7 @@ class SurpriseMeEngineImpl(
                 return SurpriseResult.Unavailable("No music available to surprise you right now. Check your internet connection or library.")
             }
 
-            val fallbackSelected = validFallback.random(Random(System.currentTimeMillis()))
+            val fallbackSelected = validFallback.random()
             val remainingFallback = validFallback.filter { it.id != fallbackSelected.id }.shuffled().take(15)
             val queue = listOf(fallbackSelected) + remainingFallback
             return SurpriseResult.Fallback(
@@ -83,7 +83,7 @@ class SurpriseMeEngineImpl(
 
         // Roulette-wheel selection
         val totalWeight = weightedPool.sumOf { it.second }
-        val randomRoll = Random(System.currentTimeMillis()).nextDouble(totalWeight)
+        val randomRoll = kotlin.random.Random.nextDouble(totalWeight)
         var cumulative = 0.0
         var selected = weightedPool.first().first
 

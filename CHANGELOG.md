@@ -5,6 +5,52 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [1.0.0-beta.2] - 2026-11-24
+
+### Added
+- **Complete Playlist Management System:**
+  - Create, rename, edit descriptions, set custom artwork URLs, pin, duplicate, clear, and delete playlists with zero media loss.
+  - Dynamic 2x2 collage artwork generator (`PlaylistCollageCover`) displaying a 4-quadrant grid from top track artworks, with graceful fallbacks for 1-3 tracks or empty playlists.
+  - Multi-select batch mode supporting multi-track removal, move between playlists, and copy to target playlists.
+  - Interactive reordering mode (Move Up / Move Down) preserving custom track sequencing in Room database.
+  - 8 sorting orders: Custom Order (saved), Recently Added, Oldest Added, Title (A-Z), Title (Z-A), Artist (A-Z), Artist (Z-A), and Duration.
+  - Live in-playlist search filter for instant real-time song filtering.
+  - Queue operations: Play All, Shuffle Play, Play Next, and Add to Queue without creating redundant Media3 player instances.
+- **Universal Add to Playlist Bottom Sheet:**
+  - Accessible universally across the app: Search results, Home shelves (Quick Picks, Daily Mix, Weekly Discover, Because You Listened), Queue track rows, Full Player Sheet, Liked Songs, and Playlist tracks.
+  - In-sheet instant playlist creation, multi-playlist target selection, live search, and indicators showing playlists already containing the selected song.
+- **Multi-Format Playlist Import Engine:**
+  - Zero-credential Spotify playlist import via public embed metadata scraper.
+  - YouTube and YouTube Music public playlist import.
+  - Local file import for M3U, M3U8, CSV, and STEREO Native JSON backup formats.
+  - Intelligent fuzzy matching engine (`TrackMatchingEngine`) featuring noise stripping (video/remaster/quality tags), artist normalization, duration delta tolerance, and version penalties preventing cover/karaoke hijacking.
+- **Multi-Format Playlist Exporter:**
+  - One-tap export to STEREO Native JSON (`STEREO_PLAYLIST_BACKUP`), standard CSV, and M3U8 with Android Sharesheet integration.
+- **Persistent Offline Downloads System:**
+  - Save full-fidelity tracks to private app storage (`files/offline_downloads/`).
+  - Dedicated Downloads screen featuring Downloaded, Active Queue (with live byte and progress percentage), and Failed tabs.
+  - Verified offline airplane-mode playback with zero network connectivity.
+  - Startup queue recovery (`init { getActiveDownloads() }`) automatically resuming interrupted downloads.
+  - Wi-Fi only download preference toggle in Settings.
+- **SYNAPSE Recommended Songs:**
+  - Contextual "Recommended Songs" section at the bottom of playlists with quick one-tap "+" addition.
+  - Intent logging for playlist additions and explicit downloads to the SYNAPSE recommendation engine without misclassifying removals as negative feedback.
+- **Permanent Direct APK Download:**
+  - Rolling GitHub Actions workflow synchronizing `latest-beta` tag and fixed download URL `https://github.com/rishibandaru3109/STEREO/releases/download/latest-beta/STEREO-latest.apk`.
+
+### Fixed
+- **HTTP 403 Stream Resolution:** InnerTubeX VisionOS client profile resolving unthrottled direct Google Video streams without stream expiry or 403 Forbidden errors.
+- **Downloads Tab Wrap Defect:** Replaced fixed `TabRow` with `ScrollableTabRow`, guarded indicator bounds, and added `maxLines = 1, softWrap = false` to eliminate `Downloade`/`d (0)` wrapping and tab switching crashes.
+- **Library Playlists Header Wrap Defect:** Repaired `Playlists` header wrapping on narrow screens with compact button padding and single-line constraints.
+- **PRNG Reseeding Lock:** Fixed `SurpriseMeEngineImpl` pseudo-random generator re-seeding bug during rapid successive sampling.
+- **Noise Regex Normalization:** Refined bracketed noise stripping in `TrackMatchingEngine` for compound tags (e.g. `[4K Remastered]`).
+
+### Compatibility
+- Signed with the permanent production RSA 4096-bit certificate (`7E:38:21:4D:3F:83:E4:FD:CC:1B:03:50:32:85:19:41:83:92:DB:E4:F6:B2:F1:AC:5F:B2:BD:03:96:D6:C0:64`).
+- **Seamless Upgrade:** All existing Alpha.4, Alpha.5, and Beta.1 users can install and update directly with 100% preservation of all listening history, favorites, settings, and cached audio.
+
+---
+
 ## [1.0.0-beta.1] - 2026-11-23
 
 ### Added

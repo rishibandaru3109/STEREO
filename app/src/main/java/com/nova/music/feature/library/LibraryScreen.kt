@@ -6,6 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -21,8 +22,10 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.History
@@ -71,6 +74,9 @@ import coil.compose.AsyncImage
 import com.nova.music.core.designsystem.theme.StereoTheme
 import com.nova.music.domain.model.Playlist
 import com.nova.music.domain.model.Track
+import com.nova.music.feature.downloads.DownloadsViewModel
+import com.nova.music.feature.library.importing.PlaylistImportBottomSheet
+import org.koin.androidx.compose.koinViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -78,9 +84,11 @@ fun LibraryScreen(
     viewModel: LibraryViewModel,
     onOpenLikedSongs: () -> Unit,
     onOpenPlaylist: (String) -> Unit,
+    onOpenDownloads: () -> Unit = {},
     onOpenSearch: () -> Unit,
     onOpenThemeGallery: () -> Unit,
     onOpenSettings: () -> Unit = {},
+    downloadsViewModel: DownloadsViewModel = koinViewModel(),
     modifier: Modifier = Modifier
 ) {
     val colors = StereoTheme.colors
@@ -105,6 +113,7 @@ fun LibraryScreen(
     }
 
     var showCreatePlaylistDialog by remember { mutableStateOf(false) }
+    var showImportPlaylistSheet by remember { mutableStateOf(false) }
     var newPlaylistName by remember { mutableStateOf("") }
     var newPlaylistDesc by remember { mutableStateOf("") }
 
@@ -246,6 +255,69 @@ fun LibraryScreen(
                 }
             }
 
+            // Downloads Hero Card
+            item {
+                val storageUsage by downloadsViewModel.storageUsage.collectAsStateWithLifecycle()
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(
+                            Brush.linearGradient(
+                                colors = listOf(
+                                    colors.surfaceElevated,
+                                    colors.surface
+                                )
+                            )
+                        )
+                        .border(1.dp, colors.surfaceHighlight, RoundedCornerShape(16.dp))
+                        .clickable(onClick = onOpenDownloads)
+                        .padding(20.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(52.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(colors.surfaceHighlight),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Download,
+                                contentDescription = null,
+                                tint = colors.primaryAccent,
+                                modifier = Modifier.size(28.dp)
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.width(16.dp))
+
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Downloads",
+                                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                                color = colors.textPrimary
+                            )
+                            Text(
+                                text = "${storageUsage.trackCount} ${if (storageUsage.trackCount == 1) "track" else "tracks"} · ${storageUsage.formattedString}",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = colors.textSecondary
+                            )
+                        }
+
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                            contentDescription = "Open Downloads",
+                            tint = colors.textSecondary,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                }
+            }
+
             // Recently Played Section
             if (recentTracks.isNotEmpty()) {
                 item {
@@ -295,28 +367,59 @@ fun LibraryScreen(
                         text = "Playlists",
                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                         color = colors.textPrimary,
-                        modifier = Modifier.weight(1f)
+                        maxLines = 1,
+                        softWrap = false,
+                        modifier = Modifier.weight(1f, fill = false)
                     )
 
-                    Button(
-                        onClick = { showCreatePlaylistDialog = true },
-                        colors = ButtonDefaults.buttonColors(containerColor = colors.surfaceElevated),
-                        border = ButtonDefaults.outlinedButtonBorder,
-                        shape = RoundedCornerShape(20.dp),
-                        contentPadding = ButtonDefaults.ContentPadding
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Add,
-                            contentDescription = null,
-                            tint = colors.primaryAccent,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = "New Playlist",
-                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                            color = colors.textPrimary
-                        )
+                    Spacer(modifier = Modifier.weight(1f))
+
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(
+                            onClick = { showImportPlaylistSheet = true },
+                            colors = ButtonDefaults.buttonColors(containerColor = colors.surfaceElevated),
+                            border = ButtonDefaults.outlinedButtonBorder,
+                            shape = RoundedCornerShape(20.dp),
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Download,
+                                contentDescription = null,
+                                tint = colors.primaryAccent,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "Import",
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                color = colors.textPrimary,
+                                maxLines = 1,
+                                softWrap = false
+                            )
+                        }
+
+                        Button(
+                            onClick = { showCreatePlaylistDialog = true },
+                            colors = ButtonDefaults.buttonColors(containerColor = colors.surfaceElevated),
+                            border = ButtonDefaults.outlinedButtonBorder,
+                            shape = RoundedCornerShape(20.dp),
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Add,
+                                contentDescription = null,
+                                tint = colors.primaryAccent,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "New Playlist",
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                color = colors.textPrimary,
+                                maxLines = 1,
+                                softWrap = false
+                            )
+                        }
                     }
                 }
             }
@@ -513,6 +616,16 @@ fun LibraryScreen(
             }
         )
     }
+
+    if (showImportPlaylistSheet) {
+        PlaylistImportBottomSheet(
+            viewModel = viewModel,
+            onPlaylistImported = { importedId ->
+                onOpenPlaylist(importedId)
+            },
+            onDismissRequest = { showImportPlaylistSheet = false }
+        )
+    }
     }
 }
 
@@ -595,30 +708,14 @@ private fun PlaylistItemRow(
             .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Cover Art
-        Box(
-            modifier = Modifier
-                .size(52.dp)
-                .clip(RoundedCornerShape(8.dp))
-                .background(colors.background),
-            contentAlignment = Alignment.Center
-        ) {
-            if (!playlist.coverArtworkUrl.isNullOrBlank()) {
-                AsyncImage(
-                    model = playlist.coverArtworkUrl,
-                    contentDescription = playlist.name,
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
-                )
-            } else {
-                Icon(
-                    imageVector = Icons.Default.PlaylistPlay,
-                    contentDescription = null,
-                    tint = colors.primaryAccent,
-                    modifier = Modifier.size(28.dp)
-                )
-            }
-        }
+        // Cover Art (Collage or Custom)
+        PlaylistCollageCover(
+            coverArtworkUrl = playlist.coverArtworkUrl,
+            topArtworkUrls = playlist.topArtworkUrls,
+            modifier = Modifier.size(52.dp),
+            cornerRadius = 8.dp,
+            iconSize = 28.dp
+        )
 
         Spacer(modifier = Modifier.width(12.dp))
 

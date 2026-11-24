@@ -14,9 +14,10 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
-class PlayerViewModel(
+class PlayerViewModel @JvmOverloads constructor(
     private val playerController: NovaPlayerController,
-    private val likedSongsRepository: LikedSongsRepository? = null
+    private val likedSongsRepository: LikedSongsRepository? = null,
+    private val downloadRepository: com.nova.music.domain.repository.DownloadRepository? = null
 ) : ViewModel() {
 
     val playbackState: StateFlow<PlaybackState> = playerController.playbackState
@@ -25,6 +26,10 @@ class PlayerViewModel(
     val likedTrackIds: StateFlow<List<String>> = likedSongsRepository?.getAllLikedTrackIds()
         ?.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
         ?: MutableStateFlow(emptyList())
+
+    val downloadedTrackIds: StateFlow<Set<String>> = downloadRepository?.downloadedTrackIds
+        ?.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptySet())
+        ?: MutableStateFlow(emptySet())
 
     fun toggleLike(track: Track) {
         likedSongsRepository?.let { repo ->
@@ -66,5 +71,16 @@ class PlayerViewModel(
             RepeatMode.ONE -> RepeatMode.OFF
         }
         playerController.setRepeatMode(next)
+    }
+
+    fun downloadTrack(track: Track) {
+        viewModelScope.launch {
+            downloadRepository?.downloadTrack(track)
+        }
+    }
+
+    fun downloadCurrentTrack() {
+        val track = playbackState.value.currentTrack ?: return
+        downloadTrack(track)
     }
 }

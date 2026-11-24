@@ -8,7 +8,8 @@ data class Playlist(
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis(),
     val isPinned: Boolean = false,
-    val trackCount: Int = 0
+    val trackCount: Int = 0,
+    val topArtworkUrls: List<String> = emptyList()
 )
 
 data class PlaylistWithTracks(

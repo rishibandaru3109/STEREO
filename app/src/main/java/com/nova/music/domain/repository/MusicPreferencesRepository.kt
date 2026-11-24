@@ -55,4 +55,8 @@ interface MusicPreferencesRepository {
 
     val synapseDiscoveryAlpha: Flow<Float> get() = flowOf(0.65f)
     suspend fun setSynapseDiscoveryAlpha(alpha: Float) {}
+
+    // Offline Download Preferences
+    val isDownloadWifiOnly: Flow<Boolean> get() = flowOf(false)
+    suspend fun setDownloadWifiOnly(wifiOnly: Boolean) {}
 }
