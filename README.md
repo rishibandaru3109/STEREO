@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/rishibandaru3109/STEREO/releases"><img src="https://img.shields.io/badge/Release-v1.0.0--beta.1-blue.svg?style=flat-square" alt="Latest Release" /></a>
+  <a href="https://github.com/rishibandaru3109/STEREO/releases"><img src="https://img.shields.io/badge/Release-v1.0.0--beta.2-blue.svg?style=flat-square" alt="Latest Release" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-GPL--3.0-green.svg?style=flat-square" alt="License: GPL-3.0" /></a>
   <a href="https://developer.android.com/about/versions/oreo"><img src="https://img.shields.io/badge/Android-8.0%2B%20(API%2026%2B)-orange.svg?style=flat-square" alt="Android 8.0+" /></a>
   <a href="https://kotlinlang.org"><img src="https://img.shields.io/badge/Kotlin-2.0-purple.svg?style=flat-square" alt="Kotlin" /></a>
@@ -21,29 +21,41 @@
 
 ## 🌟 Overview
 
-**STEREO** is an original Android music streaming and discovery application built from the ground up with Jetpack Compose, Kotlin Coroutines, and AndroidX Media3. STEREO combines high-fidelity audio playback with an advanced, personalized recommendation engine covering **40 mainstream languages** across the globe, automatic on-device audio caching for zero-data replays, and the autonomous **SYNAPSE** recommendation engine.
+**STEREO** is an original Android music streaming and discovery application built from the ground up with Jetpack Compose, Kotlin Coroutines, and AndroidX Media3. STEREO combines high-fidelity audio playback with an advanced, personalized recommendation engine covering **40 mainstream languages** across the globe, automatic on-device audio caching for zero-data replays, complete playlist management, multi-source playlist importing/exporting, offline song downloads, and the autonomous **SYNAPSE** recommendation engine.
 
 All personal preferences and listening history remain strictly on-device: zero trackers, zero telemetry, zero mandatory user accounts, and zero cloud lock-in.
 
 ---
 
-## 🚀 What's New in Release 2
+## 🚀 What's New in Beta 2
 
-### 1. Automatic Audio Caching
-- **Automatic Stream Replay:** Audio received during normal playback is automatically cached on-device in `no_backup/automatic_audio_v2` via Media3's `SimpleCache`.
-- **Zero Redundant Data Transfers:** Replaying a cached song reuses local byte ranges immediately with zero network requests.
-- **Offline Playback for Cached Tracks:** Any track whose audio spans are fully cached can be replayed without an active internet connection.
-- **Configurable Cache Storage:** Choose from 100 MB, 250 MB, 500 MB (default), 1 GB, or Unlimited directly from Settings. Least-recently-used (LRU) eviction automatically reclaims space when limits are reached while pinning active playback audio.
+### 1. Complete Playlist Management System
+- **Comprehensive Controls:** Create, rename, edit descriptions, set custom artwork URLs, pin, duplicate, clear, and delete playlists with zero media loss.
+- **Dynamic 2x2 Collage Covers:** Automatic quad-artwork generated from top playlist tracks (`PlaylistCollageCover`) with graceful single/multi-artwork fallbacks.
+- **Interactive Track Sequencing:** Drag-and-drop / Move Up / Move Down reordering stored persistently in Room database.
+- **8 Dynamic Sorting Orders:** Custom Order (saved), Recently Added, Oldest Added, Title (A-Z), Title (Z-A), Artist (A-Z), Artist (Z-A), and Duration.
+- **Live In-Playlist Filtering:** Real-time fast search filter inside any playlist.
+- **Queue Actions:** Play All, Shuffle Play, Play Next, and Add to Queue without player re-instantiation.
 
-### 2. SYNAPSE Personalized Recommendations
-- **Adaptive Behavioral Intelligence:** Learns dynamically from your real listening activity. Songs played to completion increase artist affinity; accidental skips are confidence-weighted to prevent premature artist banishing.
-- **Dual-Horizon Taste Modeling:** Separates short-term session vibes from long-term taste centroids so a single casual workout doesn't overwrite your primary music preferences.
-- **Personalized Dynamic Rails:**
-  - **Quick Picks:** Fast entry shelf curated from your highest affinity tracks.
-  - **Daily Mixes:** Curated personalized mixes featuring 4-quadrant dynamic album art covers.
-  - **Weekly Discover:** Fresh music tailored to your vibe that you haven't heard yet.
-  - **Because You Listened To [Artist]:** Lush carousels blending unplayed catalog tracks with similar artists via on-device Content Similarity modeling.
-- **Maximal Marginal Relevance (MMR):** Calibrate discovery in Settings between Adventurous (0.2), Balanced (0.65), and Familiar (0.9).
+### 2. Universal Add-to-Playlist Bottom Sheet
+- **Everywhere Access:** Accessible from Search results, Home shelves, Full Player, Queue, Liked Songs, and Playlist track rows.
+- **In-Sheet Creation & Multi-Select:** Create new playlists directly inside the sheet and add to multiple playlists simultaneously.
+
+### 3. Multi-Format Playlist Import & Export
+- **Multi-Source Importer:** Public Spotify playlist URLs (`open.spotify.com/playlist/...`), YouTube Music playlists, M3U/M3U8 playlists, CSV files, and STEREO Native JSON backups.
+- **Smart Track Matching:** `TrackMatchingEngine` normalizes video titles, strips remaster/HD tags, matches catalog songs, and filters out covers/karaoke.
+- **Multi-Format Exporter:** Export playlists to STEREO JSON, CSV, or M3U8 via the standard Android Sharesheet.
+
+### 4. Persistent Offline Downloads & Downloads Screen
+- **Full Track Downloads:** Save songs for verified offline playback into private app storage.
+- **Dedicated Downloads Hub:** Separate tabs for Downloaded, Active Queue (with live byte & % progress), and Failed transfers.
+- **Airplane-Mode Playback:** Downloaded audio plays reliably with zero active network connection.
+- **Startup Recovery:** Interrupted transfers automatically resume when the app launches.
+- **Wi-Fi Only Toggle:** Protect mobile data with configurable Wi-Fi only download preference.
+
+### 5. Playback Stability & UI Enhancements
+- **HTTP 403 Permanent Fix:** InnerTubeX VisionOS client profile ensures unthrottled streaming without stream expiry.
+- **Responsive Layouts:** Repaired tab label wrapping on narrow phone displays.
 
 ---
 
@@ -62,31 +74,38 @@ All personal preferences and listening history remain strictly on-device: zero t
 ## ✨ Features
 
 - **Music Streaming & Search:** Low-latency online catalog search and playback powered by InnerTubeX and AndroidX Media3.
-- **Background Playback & MediaSession:** Foreground service with rich media notification controls, lock-screen artwork, and system media integration.
-- **Queue & Playlists:** Persistent listening queues, queue reordering, and custom playlist creation.
-- **Favorites:** Instant liking and bookmarking of tracks preserved across app launches.
+- **Offline Downloads:** High-fidelity audio downloads for verified offline playback.
 - **Automatic Audio Caching:** On-device streaming cache for data-free replays and offline playback of cached tracks.
+- **Complete Playlist System:** Custom reordering, 8 sorting modes, 2x2 collage artwork, in-playlist search, and batch actions.
+- **Playlist Import & Export:** Scrape public Spotify and YouTube Music playlists, or import/export M3U, CSV, and JSON.
 - **SYNAPSE Personalized Recommendations:** Autonomous on-device recommendation engine modeling short-term vibes and long-term taste.
 - **Personalized Discovery:** Dynamic Quick Picks, Daily Mixes, Weekly Discover, and "Because You Listened To" shelves.
+- **Background Playback & MediaSession:** Foreground service with rich media notification controls, lock-screen artwork, and system media integration.
 - **Recommendation Preferences:** Multi-select language curation across 40 languages and MMR exploration sliders.
-- **Scroll-Aware Surprise Me FAB:** Dynamic floating action button that collapses during scrolling and smoothly expands when idle.
 - **Adaptive Theming:** 7 official themes including True Black (AMOLED), Frosted Glass, Cyberpunk Neon, and Material You dynamic color.
 
 ---
 
-## 📥 Download & Installation
+## 📥 Download STEREO
 
-### Requirements
-- **Android Version:** Android 8.0 (Oreo, API 26) or higher.
-- **Architecture:** `arm64-v8a`, `armeabi-v7a`, `x86_64`.
-- **Permissions:** Internet and Foreground Service Audio.
+### Direct Download Link (Always Latest)
+Get the latest public production APK:  
+**[⬇️ Download STEREO Latest APK](https://github.com/rishibandaru3109/STEREO/releases/download/latest-beta/STEREO-latest.apk)**
 
-### Installation Steps
-1. Navigate to [GitHub Releases](https://github.com/rishibandaru3109/STEREO/releases).
-2. Download `STEREO-v1.0.0-beta.1-release.apk` from the latest release.
-3. Open the downloaded file on your Android device.
-4. If prompted, confirm installation from unknown sources for your browser or file manager.
-5. **Seamless In-Place Update:** If you have an existing compatible installation (Release 1 Alpha.4 or Alpha.5), you can install directly over it without uninstalling; your playlists, favorites, and history will be preserved.
+> **Direct Link:** `https://github.com/rishibandaru3109/STEREO/releases/download/latest-beta/STEREO-latest.apk`  
+> Bookmark or share this link! It automatically points to the latest verified production build across all future updates.
+
+### Historical Releases & Release Notes
+Browse all tagged releases and changelogs:  
+**[GitHub Releases Archive](https://github.com/rishibandaru3109/STEREO/releases)**
+
+### Installation & Security
+- **Android Compatibility:** Android 8.0 (Oreo, API 26) through Android 16 (API 36).
+- **Direct APK Installation:** Open the downloaded `.apk` file on your device and follow the prompt to install. No root required.
+- **Seamless Updates:** All updates preserve your favorites, playlists, listening history, settings, and cached audio without data loss.
+- **Production Signing:** All official builds are signed with our permanent 4096-bit RSA release key (`7E:38:21:4D:3F:83:E4:FD:CC:1B:03:50:32:85:19:41:83:92:DB:E4:F6:B2:F1:AC:5F:B2:BD:03:96:D6:C0:64`).
+- **Offline Downloads:** Downloaded audio is stored in private app storage for verified offline listening.
+- **Reporting Issues:** If you encounter any bugs, report them on our [GitHub Issues](https://github.com/rishibandaru3109/STEREO/issues) page.
 
 ---
 

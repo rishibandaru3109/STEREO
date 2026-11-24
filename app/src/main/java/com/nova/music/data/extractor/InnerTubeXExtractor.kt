@@ -110,12 +110,7 @@ class InnerTubeXExtractor(
 
     override suspend fun resolveAudioStream(trackId: String, quality: AudioQualityMode): Result<AudioStream> = withContext(Dispatchers.IO) {
         val startTime = System.currentTimeMillis()
-        logI("Resolving audio stream via InnerTubeX for track: $trackId")
-
-        val formatSelection = if (quality != AudioQualityMode.HIGH) {
-            fallbackExtractor.resolveAudioStream(trackId, quality)
-        } else null
-        if (formatSelection?.isSuccess == true) return@withContext formatSelection
+        logI("Resolving audio stream via InnerTubeX for track: $trackId (quality=$quality)")
 
         val extracted = try {
             streamExtractor.extract(
@@ -160,7 +155,7 @@ class InnerTubeXExtractor(
         } else {
             val elapsed = System.currentTimeMillis() - startTime
             logI("InnerTubeX returned unverified or non-playable URL in ${elapsed}ms. Seamlessly falling back to YouTubeMusicExtractor for track: $trackId")
-            val fallbackResult = formatSelection ?: fallbackExtractor.resolveAudioStream(trackId, quality)
+            val fallbackResult = fallbackExtractor.resolveAudioStream(trackId, quality)
             if (fallbackResult.isSuccess) {
                 val totalElapsed = System.currentTimeMillis() - startTime
                 logI("Fallback YouTubeMusicExtractor resolved stream in ${totalElapsed}ms for track: $trackId")

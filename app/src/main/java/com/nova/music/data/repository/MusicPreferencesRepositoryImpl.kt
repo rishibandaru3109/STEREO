@@ -37,6 +37,7 @@ class MusicPreferencesRepositoryImpl(
         val KEY_CONTENT_FILTER_MODE = stringPreferencesKey("pref_content_filter_mode")
         val KEY_SYNAPSE_ENABLED = booleanPreferencesKey("synapse_recommender_enabled")
         val KEY_SYNAPSE_DISCOVERY_ALPHA = floatPreferencesKey("synapse_discovery_alpha")
+        val KEY_DOWNLOAD_WIFI_ONLY = booleanPreferencesKey("pref_download_wifi_only")
 
         val DEFAULT_LANGUAGES = setOf("English", "Hindi")
         val DEFAULT_GENRES = setOf("Pop", "Rock", "Hip-Hop", "Chill")
@@ -151,5 +152,13 @@ class MusicPreferencesRepositoryImpl(
 
     override suspend fun setSynapseDiscoveryAlpha(alpha: Float) {
         dataStore.edit { it[KEY_SYNAPSE_DISCOVERY_ALPHA] = alpha.coerceIn(0.15f, 0.95f) }
+    }
+
+    override val isDownloadWifiOnly: Flow<Boolean> = dataStore.data
+        .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
+        .map { it[KEY_DOWNLOAD_WIFI_ONLY] ?: false }
+
+    override suspend fun setDownloadWifiOnly(wifiOnly: Boolean) {
+        dataStore.edit { it[KEY_DOWNLOAD_WIFI_ONLY] = wifiOnly }
     }
 }

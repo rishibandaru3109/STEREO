@@ -17,6 +17,7 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.room.Room
 import com.nova.music.core.database.StereoDatabase
+import com.nova.music.core.database.dao.DownloadDao
 import com.nova.music.core.database.dao.HistoryDao
 import com.nova.music.core.database.dao.LikedSongDao
 import com.nova.music.core.database.dao.PlaylistDao
@@ -29,6 +30,7 @@ import com.nova.music.core.designsystem.theme.ThemeRepository
 import com.nova.music.core.designsystem.wallpaper.WallpaperPreferencesRepository
 import com.nova.music.core.designsystem.wallpaper.WallpaperRepository
 import com.nova.music.data.extractor.InnerTubeXExtractor
+import com.nova.music.data.repository.DownloadRepositoryImpl
 import com.nova.music.data.repository.HistoryRepositoryImpl
 import com.nova.music.data.repository.HomeRepositoryImpl
 import com.nova.music.data.repository.CatalogRecommendationMetadata
@@ -47,7 +49,9 @@ import com.synapse.recommendation.engine.SynapseRecommendationEngine
 import com.synapse.recommendation.taste.TasteIntelligence
 import com.nova.music.domain.recommendation.SurpriseMeEngine
 import com.nova.music.domain.recommendation.SurpriseMeEngineImpl
+import com.nova.music.domain.repository.DownloadRepository
 import com.nova.music.domain.repository.HistoryRepository
+import com.nova.music.feature.downloads.DownloadsViewModel
 import com.nova.music.domain.repository.HomeRepository
 import com.nova.music.domain.repository.LikedSongsRepository
 import com.nova.music.domain.repository.ListeningProfileRepository
@@ -129,19 +133,18 @@ val appModule = module {
         InnerTubeXExtractor(okHttpClient = get())
     }
 
-    // Repository
-    single<MusicRepository> {
-        MusicRepositoryImpl(extractor = get(), preferencesRepository = get(), networkState = get<NetworkMonitor>().state, audioCache = get())
-    }
-
-    // Room Database & DAOs with Migration(1, 2)
+    // Room Database & DAOs with Migration(1, 2, 3, 4)
     single<StereoDatabase> {
         Room.databaseBuilder(
             androidContext(),
             StereoDatabase::class.java,
             "stereo_database.db"
         )
-            .addMigrations(StereoDatabase.MIGRATION_1_2, StereoDatabase.MIGRATION_2_3)
+            .addMigrations(
+                StereoDatabase.MIGRATION_1_2,
+                StereoDatabase.MIGRATION_2_3,
+                StereoDatabase.MIGRATION_3_4
+            )
             .build()
     }
     single<TrackDao> { get<StereoDatabase>().trackDao() }
@@ -151,6 +154,30 @@ val appModule = module {
     single<QueueDao> { get<StereoDatabase>().queueDao() }
     single<RecommendationDao> { get<StereoDatabase>().recommendationDao() }
     single<SynapseDao> { get<StereoDatabase>().synapseDao() }
+    single<DownloadDao> { get<StereoDatabase>().downloadDao() }
+
+    // Offline Downloads Repository
+    single<DownloadRepository> {
+        DownloadRepositoryImpl(
+            context = androidContext(),
+            downloadDao = get(),
+            extractor = get(),
+            okHttpClient = get(),
+            synapseDao = getOrNull(),
+            preferencesRepository = getOrNull()
+        )
+    }
+
+    // Repository
+    single<MusicRepository> {
+        MusicRepositoryImpl(
+            extractor = get(),
+            preferencesRepository = get(),
+            networkState = get<NetworkMonitor>().state,
+            audioCache = get(),
+            downloadRepository = getOrNull()
+        )
+    }
 
     // Liked Songs Repository
     single<LikedSongsRepository> {
@@ -240,8 +267,6 @@ val appModule = module {
         val okHttpClient: OkHttpClient = get()
         val defaultHeaders = mapOf(
             "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
-            "Referer" to "https://music.youtube.com/",
-            "Origin" to "https://music.youtube.com",
             "Accept" to "*/*"
         )
         val httpDataSourceFactory = OkHttpDataSource.Factory(okHttpClient)
@@ -302,21 +327,24 @@ val appModule = module {
             likedSongsRepository = get(),
             preferencesRepository = get(),
             surpriseMeEngine = get(),
-            listeningProfileRepository = get()
+            listeningProfileRepository = get(),
+            downloadRepository = getOrNull()
         )
     }
 
     viewModel {
         SearchViewModel(
             musicRepository = get(),
-            playerController = get()
+            playerController = get(),
+            downloadRepository = getOrNull()
         )
     }
 
     viewModel {
         PlayerViewModel(
             playerController = get(),
-            likedSongsRepository = get()
+            likedSongsRepository = get(),
+            downloadRepository = getOrNull()
         )
     }
 
@@ -325,7 +353,18 @@ val appModule = module {
             likedSongsRepository = get(),
             playlistRepository = get(),
             historyRepository = get(),
-            playerController = get()
+            playerController = get(),
+            musicRepository = getOrNull(),
+            synapseDao = getOrNull(),
+            downloadRepository = getOrNull()
+        )
+    }
+
+    viewModel {
+        DownloadsViewModel(
+            downloadRepository = get(),
+            playerController = get(),
+            preferencesRepository = getOrNull()
         )
     }
 

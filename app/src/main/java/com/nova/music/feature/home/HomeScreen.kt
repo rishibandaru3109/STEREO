@@ -28,12 +28,14 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Block
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -77,6 +79,7 @@ import com.nova.music.domain.model.RecommendationMix
 import com.nova.music.domain.model.RecommendationSection
 import com.nova.music.domain.model.SectionType
 import com.nova.music.domain.model.Track
+import com.nova.music.feature.library.AddToPlaylistBottomSheet
 import com.nova.music.feature.navigation.StereoTopHeader
 import java.util.Calendar
 
@@ -94,6 +97,7 @@ fun HomeScreen(
     val colors = StereoTheme.colors
     val greeting = rememberGreeting()
     val context = LocalContext.current
+    var trackForPlaylist by remember { mutableStateOf<Track?>(null) }
 
     val pullToRefreshState = rememberPullToRefreshState()
     if (pullToRefreshState.isRefreshing) {
@@ -212,7 +216,12 @@ fun HomeScreen(
                                         likedTrackIds = likedTrackIds,
                                         onTrackClick = { track -> viewModel.playTrack(track, section.tracks) },
                                         onToggleLike = { viewModel.toggleLike(it) },
-                                        onNotInterested = { viewModel.notInterested(it) }
+                                        onNotInterested = { viewModel.notInterested(it) },
+                                        onAddToPlaylist = { trackForPlaylist = it },
+                                        onDownload = {
+                                            viewModel.downloadTrack(it)
+                                            Toast.makeText(context, "Downloading ${it.title}...", Toast.LENGTH_SHORT).show()
+                                        }
                                     )
                                 }
 
@@ -230,7 +239,12 @@ fun HomeScreen(
                                         likedTrackIds = likedTrackIds,
                                         onTrackClick = { track -> viewModel.playTrack(track, section.tracks) },
                                         onToggleLike = { viewModel.toggleLike(it) },
-                                        onNotInterested = { viewModel.notInterested(it) }
+                                        onNotInterested = { viewModel.notInterested(it) },
+                                        onAddToPlaylist = { trackForPlaylist = it },
+                                        onDownload = {
+                                            viewModel.downloadTrack(it)
+                                            Toast.makeText(context, "Downloading ${it.title}...", Toast.LENGTH_SHORT).show()
+                                        }
                                     )
                                 }
                             }
@@ -261,6 +275,13 @@ fun HomeScreen(
                     contentColor = colors.primaryAccent
                 )
             }
+        }
+
+        if (trackForPlaylist != null) {
+            AddToPlaylistBottomSheet(
+                track = trackForPlaylist,
+                onDismissRequest = { trackForPlaylist = null }
+            )
         }
     }
 }
@@ -314,7 +335,9 @@ private fun QuickPicksSection(
     likedTrackIds: Set<String>,
     onTrackClick: (Track) -> Unit,
     onToggleLike: (Track) -> Unit,
-    onNotInterested: (Track) -> Unit
+    onNotInterested: (Track) -> Unit,
+    onAddToPlaylist: (Track) -> Unit,
+    onDownload: (Track) -> Unit = {}
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         SectionHeader(title = section.title, subtitle = section.subtitle)
@@ -338,7 +361,9 @@ private fun QuickPicksSection(
                             isLiked = likedTrackIds.contains(track.id),
                             onClick = { onTrackClick(track) },
                             onToggleLike = { onToggleLike(track) },
-                            onNotInterested = { onNotInterested(track) }
+                            onNotInterested = { onNotInterested(track) },
+                            onAddToPlaylist = { onAddToPlaylist(track) },
+                            onDownload = { onDownload(track) }
                         )
                     }
                 }
@@ -354,7 +379,9 @@ private fun QuickPickItem(
     isLiked: Boolean,
     onClick: () -> Unit,
     onToggleLike: () -> Unit,
-    onNotInterested: () -> Unit
+    onNotInterested: () -> Unit,
+    onAddToPlaylist: () -> Unit,
+    onDownload: () -> Unit = {}
 ) {
     val colors = StereoTheme.colors
     var menuExpanded by remember { mutableStateOf(false) }
@@ -472,6 +499,26 @@ private fun QuickPickItem(
                         },
                         onClick = {
                             onNotInterested()
+                            menuExpanded = false
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Add to Playlist", color = colors.textPrimary) },
+                        leadingIcon = {
+                            Icon(imageVector = Icons.Default.PlaylistAdd, contentDescription = null, tint = colors.primaryAccent)
+                        },
+                        onClick = {
+                            onAddToPlaylist()
+                            menuExpanded = false
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Download", color = colors.textPrimary) },
+                        leadingIcon = {
+                            Icon(imageVector = Icons.Default.Download, contentDescription = null, tint = colors.primaryAccent)
+                        },
+                        onClick = {
+                            onDownload()
                             menuExpanded = false
                         }
                     )
@@ -636,7 +683,9 @@ private fun StandardTrackRowSection(
     likedTrackIds: Set<String>,
     onTrackClick: (Track) -> Unit,
     onToggleLike: (Track) -> Unit,
-    onNotInterested: (Track) -> Unit
+    onNotInterested: (Track) -> Unit,
+    onAddToPlaylist: (Track) -> Unit,
+    onDownload: (Track) -> Unit = {}
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         SectionHeader(title = section.title, subtitle = section.subtitle)
@@ -654,7 +703,9 @@ private fun StandardTrackRowSection(
                     isLiked = likedTrackIds.contains(track.id),
                     onClick = { onTrackClick(track) },
                     onToggleLike = { onToggleLike(track) },
-                    onNotInterested = { onNotInterested(track) }
+                    onNotInterested = { onNotInterested(track) },
+                    onAddToPlaylist = { onAddToPlaylist(track) },
+                    onDownload = { onDownload(track) }
                 )
             }
         }
@@ -668,7 +719,9 @@ private fun TrackCard(
     isLiked: Boolean,
     onClick: () -> Unit,
     onToggleLike: () -> Unit,
-    onNotInterested: () -> Unit
+    onNotInterested: () -> Unit,
+    onAddToPlaylist: () -> Unit,
+    onDownload: () -> Unit = {}
 ) {
     val colors = StereoTheme.colors
     var menuExpanded by remember { mutableStateOf(false) }
@@ -786,6 +839,26 @@ private fun TrackCard(
                             },
                             onClick = {
                                 onNotInterested()
+                                menuExpanded = false
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Add to Playlist", color = colors.textPrimary) },
+                            leadingIcon = {
+                                Icon(imageVector = Icons.Default.PlaylistAdd, contentDescription = null, tint = colors.primaryAccent)
+                            },
+                            onClick = {
+                                onAddToPlaylist()
+                                menuExpanded = false
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Download", color = colors.textPrimary) },
+                            leadingIcon = {
+                                Icon(imageVector = Icons.Default.Download, contentDescription = null, tint = colors.primaryAccent)
+                            },
+                            onClick = {
+                                onDownload()
                                 menuExpanded = false
                             }
                         )

@@ -136,6 +136,69 @@ class FakePlaylistDao(private val fakeTrackDao: FakeTrackDao) : PlaylistDao {
         }
     }
 
+    override suspend fun getTopArtworks(playlistId: String): List<String> {
+        return entriesFlow.value.filter { it.playlistId == playlistId }
+            .sortedBy { it.position }
+            .mapNotNull { fakeTrackDao.tracks[it.trackId]?.thumbnailUrl?.takeIf { u -> u.isNotBlank() } }
+            .distinct()
+            .take(4)
+    }
+
+    override fun getTopArtworksFlow(playlistId: String): Flow<List<String>> {
+        return entriesFlow.map { list ->
+            list.filter { it.playlistId == playlistId }
+                .sortedBy { it.position }
+                .mapNotNull { fakeTrackDao.tracks[it.trackId]?.thumbnailUrl?.takeIf { u -> u.isNotBlank() } }
+                .distinct()
+                .take(4)
+        }
+    }
+
+    override fun getTrackIdsFlow(playlistId: String): Flow<List<String>> {
+        return entriesFlow.map { list ->
+            list.filter { it.playlistId == playlistId }
+                .sortedBy { it.position }
+                .map { it.trackId }
+        }
+    }
+
+    override suspend fun getTrackIds(playlistId: String): List<String> {
+        return entriesFlow.value.filter { it.playlistId == playlistId }
+            .sortedBy { it.position }
+            .map { it.trackId }
+    }
+
+    override suspend fun containsTrack(playlistId: String, trackId: String): Boolean {
+        return entriesFlow.value.any { it.playlistId == playlistId && it.trackId == trackId }
+    }
+
+    override fun getPlaylistIdsContainingTrackFlow(trackId: String): Flow<List<String>> {
+        return entriesFlow.map { list ->
+            list.filter { it.trackId == trackId }.map { it.playlistId }.distinct()
+        }
+    }
+
+    override suspend fun getPlaylistIdsContainingTrack(trackId: String): List<String> {
+        return entriesFlow.value.filter { it.trackId == trackId }.map { it.playlistId }.distinct()
+    }
+
+    override suspend fun removeTracksFromPlaylist(playlistId: String, trackIds: List<String>) {
+        val removeSet = trackIds.toSet()
+        entriesFlow.value = entriesFlow.value.filterNot { it.playlistId == playlistId && it.trackId in removeSet }
+    }
+
+    override suspend fun updatePlaylistDetails(playlistId: String, name: String, description: String?, coverArtworkUrl: String?, timestamp: Long) {
+        playlistsFlow.value[playlistId]?.let {
+            insertPlaylist(it.copy(name = name, description = description, coverArtworkUrl = coverArtworkUrl, updatedAt = timestamp))
+        }
+    }
+
+    override suspend fun updatePlaylistCover(playlistId: String, coverArtworkUrl: String?, timestamp: Long) {
+        playlistsFlow.value[playlistId]?.let {
+            insertPlaylist(it.copy(coverArtworkUrl = coverArtworkUrl, updatedAt = timestamp))
+        }
+    }
+
     override suspend fun setPlaylistPinned(playlistId: String, isPinned: Boolean, timestamp: Long) {
         playlistsFlow.value[playlistId]?.let {
             insertPlaylist(it.copy(isPinned = isPinned, updatedAt = timestamp))
@@ -244,5 +307,113 @@ class PlaylistRepositoryTest {
 
         repository.setPlaylistPinned(playlistId, true)
         assertTrue(repository.getPlaylist(playlistId).first()?.isPinned ?: false)
+    }
+
+    @Test
+    fun testDuplicatePrevention() = runTest {
+        val playlistId = repository.createPlaylist("No Duplicates")
+        val addedFirst = repository.addTrackToPlaylist(playlistId, trackA, allowDuplicates = false)
+        assertTrue(addedFirst)
+
+        val addedDuplicate = repository.addTrackToPlaylist(playlistId, trackA, allowDuplicates = false)
+        assertFalse(addedDuplicate)
+
+        val tracks = repository.getPlaylistTracks(playlistId).first()
+        assertEquals(1, tracks.size)
+
+        // Adding with allowDuplicates = true should succeed
+        val addedExplicitDup = repository.addTrackToPlaylist(playlistId, trackA, allowDuplicates = true)
+        assertTrue(addedExplicitDup)
+        val tracksAfter = repository.getPlaylistTracks(playlistId).first()
+        assertEquals(2, tracksAfter.size)
+    }
+
+    @Test
+    fun testMoveTracksBetweenPlaylists() = runTest {
+        val p1 = repository.createPlaylist("Playlist 1")
+        val p2 = repository.createPlaylist("Playlist 2")
+
+        repository.addTracksToPlaylist(p1, listOf(trackA, trackB, trackC))
+        repository.moveTracksBetweenPlaylists(p1, p2, listOf(trackA.id, trackB.id))
+
+        val p1Tracks = repository.getPlaylistTracks(p1).first()
+        val p2Tracks = repository.getPlaylistTracks(p2).first()
+
+        assertEquals(1, p1Tracks.size)
+        assertEquals("Song C", p1Tracks[0].title)
+
+        assertEquals(2, p2Tracks.size)
+        assertEquals("Song A", p2Tracks[0].title)
+        assertEquals("Song B", p2Tracks[1].title)
+    }
+
+    @Test
+    fun testCopyTracksToPlaylist() = runTest {
+        val p1 = repository.createPlaylist("Source")
+        val p2 = repository.createPlaylist("Destination")
+
+        repository.addTracksToPlaylist(p1, listOf(trackA, trackB))
+        repository.copyTracksToPlaylist(p2, listOf(trackA.id, trackB.id))
+
+        val p1Tracks = repository.getPlaylistTracks(p1).first()
+        val p2Tracks = repository.getPlaylistTracks(p2).first()
+
+        assertEquals(2, p1Tracks.size)
+        assertEquals(2, p2Tracks.size)
+        assertEquals("Song A", p2Tracks[0].title)
+        assertEquals("Song B", p2Tracks[1].title)
+    }
+
+    @Test
+    fun testDuplicatePlaylist() = runTest {
+        val originalId = repository.createPlaylist("Original", "A description")
+        repository.addTracksToPlaylist(originalId, listOf(trackA, trackB))
+
+        val clonedId = repository.duplicatePlaylist(originalId)
+        assertTrue(clonedId.isNotBlank())
+
+        val cloned = repository.getPlaylist(clonedId).first()
+        assertNotNull(cloned)
+        assertEquals("Original (Copy)", cloned?.name)
+        assertEquals(2, cloned?.trackCount)
+
+        val clonedTracks = repository.getPlaylistTracks(clonedId).first()
+        assertEquals(2, clonedTracks.size)
+        assertEquals("Song A", clonedTracks[0].title)
+        assertEquals("Song B", clonedTracks[1].title)
+    }
+
+    @Test
+    fun testReorderAllTracks() = runTest {
+        val playlistId = repository.createPlaylist("Reorder Test")
+        repository.addTracksToPlaylist(playlistId, listOf(trackA, trackB, trackC))
+
+        // Reverse the order: C, B, A
+        repository.reorderAllTracks(playlistId, listOf(trackC.id, trackB.id, trackA.id))
+
+        val tracks = repository.getPlaylistTracks(playlistId).first()
+        assertEquals(3, tracks.size)
+        assertEquals("Song C", tracks[0].title)
+        assertEquals("Song B", tracks[1].title)
+        assertEquals("Song A", tracks[2].title)
+    }
+
+    @Test
+    fun testTrackIdsAndContainingPlaylists() = runTest {
+        val p1 = repository.createPlaylist("P1")
+        val p2 = repository.createPlaylist("P2")
+
+        repository.addTrackToPlaylist(p1, trackA)
+        repository.addTrackToPlaylist(p2, trackA)
+        repository.addTrackToPlaylist(p2, trackB)
+
+        val p1TrackIds = repository.getPlaylistTrackIds(p1).first()
+        assertEquals(setOf(trackA.id), p1TrackIds)
+
+        val containingA = repository.getPlaylistIdsContainingTrack(trackA.id).first()
+        assertEquals(setOf(p1, p2), containingA)
+
+        val containingB = repository.getPlaylistIdsContainingTrack(trackB.id).first()
+        assertEquals(setOf(p2), containingB)
     }
 }

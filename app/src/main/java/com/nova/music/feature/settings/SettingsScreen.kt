@@ -123,6 +123,7 @@ fun SettingsScreen(
     val synapseDiscoveryAlpha by viewModel.synapseDiscoveryAlpha.collectAsStateWithLifecycle()
     val isHistoryEnabled by viewModel.isHistoryEnabled.collectAsStateWithLifecycle()
     val contentFilterMode by viewModel.contentFilterMode.collectAsStateWithLifecycle()
+    val isDownloadWifiOnly by viewModel.isDownloadWifiOnly.collectAsStateWithLifecycle()
 
     var showOnboardingDialog by remember { mutableStateOf(false) }
 
@@ -566,7 +567,7 @@ fun SettingsScreen(
                     SettingsSectionTitle("Audio quality")
                     AudioQualityMode.entries.forEach { mode ->
                         SettingsCategoryCard(
-                            title = (if (qualityMode == mode) "ÃƒÂ¢Ã…â€œÃ¢â‚¬Å“ " else "") + mode.label,
+                            title = (if (qualityMode == mode) "✓ " else "") + mode.label,
                             subtitle = mode.description,
                             icon = if (qualityMode == mode) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
                             onClick = { viewModel.setAudioQualityMode(mode) }
@@ -577,6 +578,42 @@ fun SettingsScreen(
                         style = MaterialTheme.typography.bodySmall.copy(color = colors.textSecondary)
                     )
                     Spacer(modifier = Modifier.height(16.dp))
+
+                    SettingsSectionTitle("Offline Downloads")
+                    Spacer(modifier = Modifier.height(8.dp))
+                    SettingsDetailCard {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Download over Wi-Fi only",
+                                    style = MaterialTheme.typography.bodyMedium.copy(
+                                        color = colors.textPrimary,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                )
+                                Text(
+                                    text = "Prevent offline track downloads when connected to cellular data",
+                                    style = MaterialTheme.typography.bodySmall.copy(color = colors.textSecondary)
+                                )
+                            }
+                            Switch(
+                                checked = isDownloadWifiOnly,
+                                onCheckedChange = { viewModel.setDownloadWifiOnly(it) },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = colors.primaryAccent,
+                                    checkedTrackColor = colors.primaryAccent.copy(alpha = 0.5f)
+                                )
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(16.dp))
+
                     if (BuildConfig.DEBUG) {
                         SettingsSectionTitle("Network usage this process")
                         SettingsDetailCard {
@@ -604,7 +641,7 @@ fun SettingsScreen(
                         SettingsInfoRow(title = "Audio Focus Handling", value = "Automatic ducking / pause on phone calls")
                         SettingsInfoRow(title = "Headphone Disconnect", value = "Auto-pause on unplug / Bluetooth disconnect")
                         SettingsInfoRow(title = "Shuffle Algorithm", value = "Balanced Fisher-Yates (Artist Diversity)")
-                        SettingsInfoRow(title = "Forward Buffer", value = "5ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“15 seconds")
+                        SettingsInfoRow(title = "Forward Buffer", value = "5–15 seconds")
                     }
 
                     Spacer(modifier = Modifier.height(80.dp))

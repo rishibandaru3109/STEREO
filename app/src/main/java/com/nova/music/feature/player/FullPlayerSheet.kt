@@ -1,5 +1,6 @@
 package com.nova.music.feature.player
 
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -18,12 +19,15 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.DownloadDone
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.QueueMusic
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.RepeatOne
@@ -51,6 +55,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -63,6 +68,7 @@ import com.nova.music.core.designsystem.wallpaper.WallpaperBackdrop
 import com.nova.music.feature.wallpaper.WallpaperViewModel
 import com.nova.music.domain.model.PlayerStatus
 import com.nova.music.domain.model.RepeatMode
+import com.nova.music.feature.library.AddToPlaylistBottomSheet
 import org.koin.androidx.compose.koinViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -75,9 +81,13 @@ fun FullPlayerSheet(
     val track = state.currentTrack ?: return
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val colors = StereoTheme.colors
+    val context = LocalContext.current
     val wallpaperViewModel: WallpaperViewModel = koinViewModel()
     val wallpaperConfig by wallpaperViewModel.wallpaperConfig.collectAsStateWithLifecycle()
+    val downloadedTrackIds by viewModel.downloadedTrackIds.collectAsStateWithLifecycle()
+    val isDownloaded = downloadedTrackIds.contains(track.id)
     var isQueueSheetOpen by remember { mutableStateOf(false) }
+    var isAddToPlaylistOpen by remember { mutableStateOf(false) }
 
     ModalBottomSheet(
         onDismissRequest = onDismissRequest,
@@ -133,6 +143,31 @@ fun FullPlayerSheet(
                 }
 
                 Spacer(modifier = Modifier.weight(1f))
+                IconButton(onClick = {
+                    if (isDownloaded) {
+                        Toast.makeText(context, "${track.title} is already downloaded", Toast.LENGTH_SHORT).show()
+                    } else {
+                        viewModel.downloadCurrentTrack()
+                        Toast.makeText(context, "Downloading ${track.title}...", Toast.LENGTH_SHORT).show()
+                    }
+                }) {
+                    Icon(
+                        imageVector = if (isDownloaded) Icons.Default.DownloadDone else Icons.Default.Download,
+                        contentDescription = if (isDownloaded) "Downloaded" else "Download",
+                        tint = if (isDownloaded) colors.primaryAccent else colors.textPrimary,
+                        modifier = Modifier.size(26.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                IconButton(onClick = { isAddToPlaylistOpen = true }) {
+                    Icon(
+                        imageVector = Icons.Default.PlaylistAdd,
+                        contentDescription = "Add to Playlist",
+                        tint = colors.textPrimary,
+                        modifier = Modifier.size(26.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(8.dp))
                 IconButton(onClick = { isQueueSheetOpen = true }) {
                     Icon(
                         imageVector = Icons.Default.QueueMusic,
@@ -360,6 +395,13 @@ fun FullPlayerSheet(
         QueueSheet(
             viewModel = viewModel,
             onDismissRequest = { isQueueSheetOpen = false }
+        )
+    }
+
+    if (isAddToPlaylistOpen) {
+        AddToPlaylistBottomSheet(
+            track = track,
+            onDismissRequest = { isAddToPlaylistOpen = false }
         )
     }
 }

@@ -18,6 +18,7 @@ import java.net.URI
 import com.nova.music.domain.model.Track
 import com.nova.music.domain.recommendation.ContentFilter
 import com.nova.music.domain.repository.ContentFilterMode
+import com.nova.music.domain.repository.DownloadRepository
 import com.nova.music.domain.repository.MusicExtractor
 import com.nova.music.domain.repository.MusicPreferencesRepository
 import com.nova.music.domain.repository.MusicRepository
@@ -29,7 +30,8 @@ class MusicRepositoryImpl(
     private val extractor: MusicExtractor,
     private val preferencesRepository: MusicPreferencesRepository? = null,
     private val networkState: Flow<NetworkState> = flowOf(NetworkState()),
-    private val audioCache: AudioCacheEngine? = null
+    private val audioCache: AudioCacheEngine? = null,
+    private val downloadRepository: DownloadRepository? = null
 ) : MusicRepository {
     override val networkConnected: Flow<Boolean> = networkState.map { it.connected }.distinctUntilChanged()
 
@@ -66,12 +68,21 @@ class MusicRepositoryImpl(
     override suspend fun resolveStream(trackId: String): Result<AudioStream> {
         val quality = effectiveAudioQuality.first()
         val connected = networkState.first().connected
+
+        // 1. Check persistent offline downloads first
+        val downloaded = downloadRepository?.getCompletedDownloadStream(trackId)
+        if (downloaded != null) {
+            TrafficMeter.counters.metadataCacheHit()
+            return Result.success(downloaded)
+        }
+
+        // 2. Check automatic LRU cache
         audioCache?.fullyCached(trackId, quality, allowAnyQuality = !connected)?.let {
             TrafficMeter.counters.metadataCacheHit()
             return Result.success(it)
         }
-        if (!connected && audioCache != null) {
-            return Result.failure(java.io.IOException("Offline: this song is not completely cached at the selected quality"))
+        if (!connected && (audioCache != null || downloadRepository != null)) {
+            return Result.failure(java.io.IOException("Offline: this song is not downloaded or cached"))
         }
         val key = trackId to quality
         val lock = resolutionLocks[(key.hashCode() and Int.MAX_VALUE) % resolutionLocks.size]

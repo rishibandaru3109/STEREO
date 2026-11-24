@@ -68,20 +68,35 @@ class PlaylistRepositoryImpl(
             getPlaylistTracks(playlistId)
         ) { playlist, tracks ->
             if (playlist != null) {
-                PlaylistWithTracks(playlist = playlist, tracks = tracks)
+                val topArtworks = tracks.mapNotNull { it.thumbnailUrl.takeIf { u -> u.isNotBlank() } }
+                    .distinct()
+                    .take(4)
+                PlaylistWithTracks(
+                    playlist = playlist.copy(topArtworkUrls = topArtworks),
+                    tracks = tracks
+                )
             } else {
                 null
             }
         }
     }
 
-    override suspend fun createPlaylist(name: String, description: String?): String {
+    override fun getPlaylistTrackIds(playlistId: String): Flow<Set<String>> {
+        return playlistDao.getTrackIdsFlow(playlistId).map { it.toSet() }
+    }
+
+    override fun getPlaylistIdsContainingTrack(trackId: String): Flow<Set<String>> {
+        return playlistDao.getPlaylistIdsContainingTrackFlow(trackId).map { it.toSet() }
+    }
+
+    override suspend fun createPlaylist(name: String, description: String?, coverArtworkUrl: String?): String {
         val id = UUID.randomUUID().toString()
         val now = System.currentTimeMillis()
         val entity = PlaylistEntity(
             id = id,
             name = name.trim(),
             description = description?.trim(),
+            coverArtworkUrl = coverArtworkUrl?.trim(),
             createdAt = now,
             updatedAt = now
         )
@@ -93,11 +108,53 @@ class PlaylistRepositoryImpl(
         playlistDao.renamePlaylist(playlistId, newName.trim())
     }
 
+    override suspend fun updatePlaylistDetails(
+        playlistId: String,
+        name: String,
+        description: String?,
+        coverArtworkUrl: String?
+    ) {
+        playlistDao.updatePlaylistDetails(
+            playlistId = playlistId,
+            name = name.trim(),
+            description = description?.trim(),
+            coverArtworkUrl = coverArtworkUrl?.trim(),
+            timestamp = System.currentTimeMillis()
+        )
+    }
+
+    override suspend fun updatePlaylistCover(playlistId: String, coverArtworkUrl: String?) {
+        playlistDao.updatePlaylistCover(playlistId, coverArtworkUrl?.trim(), System.currentTimeMillis())
+    }
+
     override suspend fun deletePlaylist(playlistId: String) {
         playlistDao.deletePlaylist(playlistId)
     }
 
+    override suspend fun duplicatePlaylist(playlistId: String, newName: String?): String {
+        val source = playlistDao.getPlaylistById(playlistId) ?: return ""
+        val targetName = newName?.trim() ?: "${source.name} (Copy)"
+        val newId = UUID.randomUUID().toString()
+        playlistDao.duplicatePlaylist(
+            sourcePlaylistId = playlistId,
+            newPlaylistId = newId,
+            newName = targetName
+        )
+        return newId
+    }
+
     override suspend fun addTrackToPlaylist(playlistId: String, track: Track) {
+        addTrackToPlaylist(playlistId, track, allowDuplicates = false)
+    }
+
+    override suspend fun addTrackToPlaylist(
+        playlistId: String,
+        track: Track,
+        allowDuplicates: Boolean
+    ): Boolean {
+        if (!allowDuplicates && playlistDao.containsTrack(playlistId, track.id)) {
+            return false
+        }
         trackDao.upsert(TrackEntity.fromTrack(track))
         val currentMax = playlistDao.getMaxPosition(playlistId)
         val nextPos = if (currentMax >= 0) currentMax + 1 else 0
@@ -108,15 +165,36 @@ class PlaylistRepositoryImpl(
         )
         playlistDao.insertEntry(entry)
         playlistDao.updatePlaylistTimestamp(playlistId, System.currentTimeMillis())
+        return true
     }
 
     override suspend fun addTracksToPlaylist(playlistId: String, tracks: List<Track>) {
-        if (tracks.isEmpty()) return
-        trackDao.upsertAll(tracks.map { TrackEntity.fromTrack(it) })
+        addTracksToPlaylist(playlistId, tracks, allowDuplicates = false)
+    }
+
+    override suspend fun addTracksToPlaylist(
+        playlistId: String,
+        tracks: List<Track>,
+        allowDuplicates: Boolean
+    ): Int {
+        if (tracks.isEmpty()) return 0
+        val existingTrackIds = if (!allowDuplicates) {
+            playlistDao.getTrackIds(playlistId).toSet()
+        } else {
+            emptySet()
+        }
+        val tracksToAdd = if (!allowDuplicates) {
+            tracks.filterNot { it.id in existingTrackIds }
+        } else {
+            tracks
+        }
+        if (tracksToAdd.isEmpty()) return 0
+
+        trackDao.upsertAll(tracksToAdd.map { TrackEntity.fromTrack(it) })
         val currentMax = playlistDao.getMaxPosition(playlistId)
         var startPos = if (currentMax >= 0) currentMax + 1 else 0
 
-        val entries = tracks.map { track ->
+        val entries = tracksToAdd.map { track ->
             PlaylistEntryEntity(
                 playlistId = playlistId,
                 trackId = track.id,
@@ -125,10 +203,39 @@ class PlaylistRepositoryImpl(
         }
         playlistDao.insertEntries(entries)
         playlistDao.updatePlaylistTimestamp(playlistId, System.currentTimeMillis())
+        return tracksToAdd.size
     }
 
     override suspend fun removeTrackFromPlaylist(playlistId: String, trackId: String) {
         playlistDao.removeTrackFromPlaylist(playlistId, trackId)
+        playlistDao.recompactPositions(playlistId)
+    }
+
+    override suspend fun removeTracksFromPlaylist(playlistId: String, trackIds: List<String>) {
+        if (trackIds.isEmpty()) return
+        playlistDao.removeTracksFromPlaylist(playlistId, trackIds)
+        playlistDao.recompactPositions(playlistId)
+    }
+
+    override suspend fun moveTracksBetweenPlaylists(
+        sourcePlaylistId: String,
+        targetPlaylistId: String,
+        trackIds: List<String>
+    ) {
+        if (trackIds.isEmpty() || sourcePlaylistId == targetPlaylistId) return
+        val tracks = trackDao.getTracksByIds(trackIds).map { it.toTrack() }
+        addTracksToPlaylist(targetPlaylistId, tracks, allowDuplicates = false)
+        removeTracksFromPlaylist(sourcePlaylistId, trackIds)
+    }
+
+    override suspend fun copyTracksToPlaylist(targetPlaylistId: String, trackIds: List<String>) {
+        if (trackIds.isEmpty()) return
+        val tracks = trackDao.getTracksByIds(trackIds).map { it.toTrack() }
+        addTracksToPlaylist(targetPlaylistId, tracks, allowDuplicates = false)
+    }
+
+    override suspend fun clearPlaylist(playlistId: String) {
+        playlistDao.clearEntriesForPlaylist(playlistId)
         playlistDao.updatePlaylistTimestamp(playlistId, System.currentTimeMillis())
     }
 
@@ -142,6 +249,10 @@ class PlaylistRepositoryImpl(
 
         val orderedIds = entries.map { it.id }
         playlistDao.reorderEntries(playlistId, orderedIds)
+    }
+
+    override suspend fun reorderAllTracks(playlistId: String, orderedTrackIds: List<String>) {
+        playlistDao.reorderEntriesByTrackIds(playlistId, orderedTrackIds)
     }
 
     override suspend fun setPlaylistPinned(playlistId: String, isPinned: Boolean) {

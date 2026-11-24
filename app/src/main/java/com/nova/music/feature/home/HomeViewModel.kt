@@ -46,7 +46,8 @@ class HomeViewModel @JvmOverloads constructor(
     private val likedSongsRepository: LikedSongsRepository,
     private val preferencesRepository: MusicPreferencesRepository? = null,
     private val surpriseMeEngine: SurpriseMeEngine? = null,
-    private val listeningProfileRepository: ListeningProfileRepository? = null
+    private val listeningProfileRepository: ListeningProfileRepository? = null,
+    private val downloadRepository: com.nova.music.domain.repository.DownloadRepository? = null
 ) : ViewModel() {
 
     val isOnboardingCompleted: StateFlow<Boolean> = preferencesRepository?.isOnboardingCompleted
@@ -226,6 +227,12 @@ class HomeViewModel @JvmOverloads constructor(
     fun completeOnboarding(languages: Set<String>, genres: Set<String>, discoveryMode: String) {
         viewModelScope.launch {
             preferencesRepository?.saveRecommendationPreferences(languages, genres, discoveryMode)
+        }
+    }
+
+    fun downloadTrack(track: Track) {
+        viewModelScope.launch {
+            downloadRepository?.downloadTrack(track)
         }
     }
 }

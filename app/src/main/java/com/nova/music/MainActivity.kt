@@ -33,6 +33,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nova.music.core.designsystem.theme.StereoTheme
 import com.nova.music.core.designsystem.wallpaper.WallpaperBackdrop
 import com.nova.music.core.designsystem.wallpaper.WallpaperConfig
+import com.nova.music.feature.downloads.DownloadsScreen
 import com.nova.music.feature.home.HomeScreen
 import com.nova.music.feature.home.HomeViewModel
 import com.nova.music.feature.library.LibraryScreen
@@ -58,6 +59,7 @@ import org.koin.androidx.compose.koinViewModel
 enum class SubScreen {
     LIKED_SONGS,
     PLAYLIST_DETAILS,
+    DOWNLOADS,
     THEMES,
     THEME_STUDIO,
     WALLPAPER_STUDIO,
@@ -120,7 +122,7 @@ fun StereoApp() {
                 activeSubScreen == SubScreen.THEMES || activeSubScreen == SubScreen.SETTINGS -> {
                     activeSubScreen = null
                 }
-                activeSubScreen == SubScreen.LIKED_SONGS || activeSubScreen == SubScreen.PLAYLIST_DETAILS -> {
+                activeSubScreen == SubScreen.LIKED_SONGS || activeSubScreen == SubScreen.PLAYLIST_DETAILS || activeSubScreen == SubScreen.DOWNLOADS -> {
                     activeSubScreen = null
                 }
                 selectedTab != NavigationTab.HOME -> {
@@ -164,6 +166,12 @@ fun StereoApp() {
                             SubScreen.PLAYLIST_DETAILS -> {
                                 PlaylistDetailScreen(
                                     viewModel = libraryViewModel,
+                                    onBackClick = { activeSubScreen = null },
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            }
+                            SubScreen.DOWNLOADS -> {
+                                DownloadsScreen(
                                     onBackClick = { activeSubScreen = null },
                                     modifier = Modifier.fillMaxSize()
                                 )
@@ -236,6 +244,7 @@ fun StereoApp() {
                                             libraryViewModel.selectPlaylist(playlistId)
                                             activeSubScreen = SubScreen.PLAYLIST_DETAILS
                                         },
+                                        onOpenDownloads = { activeSubScreen = SubScreen.DOWNLOADS },
                                         onOpenSearch = { selectedTab = NavigationTab.SEARCH },
                                         onOpenThemeGallery = { activeSubScreen = SubScreen.THEMES },
                                         onOpenSettings = { activeSubScreen = SubScreen.SETTINGS },

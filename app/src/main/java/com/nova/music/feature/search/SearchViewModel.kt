@@ -28,9 +28,10 @@ data class SearchScreenState(
     val isRefreshing: Boolean = false
 )
 
-class SearchViewModel(
+class SearchViewModel @JvmOverloads constructor(
     private val musicRepository: MusicRepository,
-    private val playerController: NovaPlayerController
+    private val playerController: NovaPlayerController,
+    private val downloadRepository: com.nova.music.domain.repository.DownloadRepository? = null
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SearchScreenState())
@@ -137,6 +138,20 @@ class SearchViewModel(
             else playerController.playTrack(track)
         } else {
             playerController.playTrack(track)
+        }
+    }
+
+    fun playNext(track: Track) {
+        playerController.playNext(track)
+    }
+
+    fun addToQueue(track: Track) {
+        playerController.addToQueue(track)
+    }
+
+    fun downloadTrack(track: Track) {
+        viewModelScope.launch {
+            downloadRepository?.downloadTrack(track)
         }
     }
 }

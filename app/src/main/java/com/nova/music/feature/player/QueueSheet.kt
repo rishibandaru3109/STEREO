@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.QueueMusic
 import androidx.compose.material.icons.filled.Undo
 import androidx.compose.material3.Button
@@ -36,6 +37,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -48,6 +52,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.nova.music.core.designsystem.theme.StereoTheme
 import com.nova.music.domain.model.Track
+import com.nova.music.feature.library.AddToPlaylistBottomSheet
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -63,6 +68,7 @@ fun QueueSheet(
     val activeQueue = snapshot.activeQueue
     val currentIndex = snapshot.currentIndex
     val upcomingTracks = snapshot.upcomingTracks
+    var trackForPlaylist by remember { mutableStateOf<Track?>(null) }
 
     ModalBottomSheet(
         onDismissRequest = onDismissRequest,
@@ -201,6 +207,15 @@ fun QueueSheet(
                                     tint = colors.primaryAccent,
                                     modifier = Modifier.size(24.dp)
                                 )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                IconButton(onClick = { trackForPlaylist = currentTrack }) {
+                                    Icon(
+                                        imageVector = Icons.Default.PlaylistAdd,
+                                        contentDescription = "Add to Playlist",
+                                        tint = colors.primaryAccent,
+                                        modifier = Modifier.size(22.dp)
+                                    )
+                                }
                             }
                         }
                     }
@@ -240,7 +255,8 @@ fun QueueSheet(
                         QueueTrackRow(
                             track = track,
                             onClick = { viewModel.jumpToQueueIndex(absoluteIndex) },
-                            onRemove = { viewModel.removeFromQueue(absoluteIndex) }
+                            onRemove = { viewModel.removeFromQueue(absoluteIndex) },
+                            onAddToPlaylist = { trackForPlaylist = track }
                         )
                     }
                 }
@@ -250,6 +266,13 @@ fun QueueSheet(
                 }
             }
         }
+
+        if (trackForPlaylist != null) {
+            AddToPlaylistBottomSheet(
+                track = trackForPlaylist,
+                onDismissRequest = { trackForPlaylist = null }
+            )
+        }
     }
 }
 
@@ -257,7 +280,8 @@ fun QueueSheet(
 private fun QueueTrackRow(
     track: Track,
     onClick: () -> Unit,
-    onRemove: () -> Unit
+    onRemove: () -> Unit,
+    onAddToPlaylist: () -> Unit
 ) {
     val colors = StereoTheme.colors
 
@@ -311,6 +335,15 @@ private fun QueueTrackRow(
                 color = colors.textSecondary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
+            )
+        }
+
+        IconButton(onClick = onAddToPlaylist) {
+            Icon(
+                imageVector = Icons.Default.PlaylistAdd,
+                contentDescription = "Add to Playlist",
+                tint = colors.textTertiary,
+                modifier = Modifier.size(20.dp)
             )
         }
 

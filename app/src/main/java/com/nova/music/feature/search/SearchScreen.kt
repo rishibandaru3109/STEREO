@@ -1,5 +1,6 @@
 package com.nova.music.feature.search
 
+import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -25,12 +26,18 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.LibraryMusic
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.PlaylistAdd
+import androidx.compose.material.icons.filled.QueueMusic
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -43,11 +50,15 @@ import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -58,6 +69,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.nova.music.core.designsystem.theme.StereoTheme
 import com.nova.music.domain.model.Track
+import com.nova.music.feature.library.AddToPlaylistBottomSheet
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -70,7 +82,9 @@ fun SearchScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val keyboardController = LocalSoftwareKeyboardController.current
+    val context = LocalContext.current
     val colors = StereoTheme.colors
+    var trackForPlaylist by remember { mutableStateOf<Track?>(null) }
 
     val pullToRefreshState = rememberPullToRefreshState()
     if (pullToRefreshState.isRefreshing) {
@@ -231,6 +245,13 @@ fun SearchScreen(
                                 onClick = {
                                     viewModel.onTrackSelected(track)
                                     keyboardController?.hide()
+                                },
+                                onPlayNext = { viewModel.playNext(track) },
+                                onAddToQueue = { viewModel.addToQueue(track) },
+                                onAddToPlaylist = { trackForPlaylist = track },
+                                onDownload = {
+                                    viewModel.downloadTrack(track)
+                                    Toast.makeText(context, "Downloading ${track.title}...", Toast.LENGTH_SHORT).show()
                                 }
                             )
                         }
@@ -249,6 +270,13 @@ fun SearchScreen(
         }
     }
 }
+
+    if (trackForPlaylist != null) {
+        AddToPlaylistBottomSheet(
+            track = trackForPlaylist,
+            onDismissRequest = { trackForPlaylist = null }
+        )
+    }
 }
 
 @Composable
@@ -256,9 +284,14 @@ private fun TrackItem(
     track: Track,
     isCurrentlyPlaying: Boolean,
     onClick: () -> Unit,
+    onPlayNext: () -> Unit,
+    onAddToQueue: () -> Unit,
+    onAddToPlaylist: () -> Unit,
+    onDownload: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val colors = StereoTheme.colors
+    var menuExpanded by remember { mutableStateOf(false) }
 
     Row(
         modifier = modifier
@@ -334,6 +367,70 @@ private fun TrackItem(
                 style = MaterialTheme.typography.labelSmall,
                 color = colors.textTertiary
             )
+        }
+
+        Spacer(modifier = Modifier.width(4.dp))
+
+        // 3-dot overflow menu
+        Box {
+            IconButton(
+                onClick = { menuExpanded = true },
+                modifier = Modifier.size(36.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.MoreVert,
+                    contentDescription = "Options",
+                    tint = colors.textSecondary,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+
+            DropdownMenu(
+                expanded = menuExpanded,
+                onDismissRequest = { menuExpanded = false },
+                modifier = Modifier.background(colors.surfaceElevated)
+            ) {
+                DropdownMenuItem(
+                    text = { Text("Play Next", color = colors.textPrimary) },
+                    leadingIcon = {
+                        Icon(imageVector = Icons.Default.QueueMusic, contentDescription = null, tint = colors.textSecondary)
+                    },
+                    onClick = {
+                        menuExpanded = false
+                        onPlayNext()
+                    }
+                )
+                DropdownMenuItem(
+                    text = { Text("Add to Queue", color = colors.textPrimary) },
+                    leadingIcon = {
+                        Icon(imageVector = Icons.Default.QueueMusic, contentDescription = null, tint = colors.textSecondary)
+                    },
+                    onClick = {
+                        menuExpanded = false
+                        onAddToQueue()
+                    }
+                )
+                DropdownMenuItem(
+                    text = { Text("Add to Playlist", color = colors.textPrimary) },
+                    leadingIcon = {
+                        Icon(imageVector = Icons.Default.PlaylistAdd, contentDescription = null, tint = colors.primaryAccent)
+                    },
+                    onClick = {
+                        menuExpanded = false
+                        onAddToPlaylist()
+                    }
+                )
+                DropdownMenuItem(
+                    text = { Text("Download", color = colors.textPrimary) },
+                    leadingIcon = {
+                        Icon(imageVector = Icons.Default.Download, contentDescription = null, tint = colors.primaryAccent)
+                    },
+                    onClick = {
+                        menuExpanded = false
+                        onDownload()
+                    }
+                )
+            }
         }
     }
 }
